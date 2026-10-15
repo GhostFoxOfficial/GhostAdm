@@ -11,6 +11,6 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostFoxOfficial/Ghos
 
 ## Developers
 
-### Creator: [Edge](https://github.com/GhostFoxOfficial)
+### Creator: [Ghost Fox](https://github.com/GhostFoxOfficial)
 
 Currently i-in dev.
