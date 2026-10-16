@@ -4506,7 +4506,7 @@ CMDs[#CMDs + 1] = {NAME = 'guidelete', DESC = 'Enables backspace to delete GUI'}
 CMDs[#CMDs + 1] = {NAME = 'unguidelete / noguidelete', DESC = 'Disables guidelete'}
 CMDs[#CMDs + 1] = {NAME = 'hidega', DESC = 'Hides the main GA GUI'}
 CMDs[#CMDs + 1] = {NAME = 'showga / unhidega', DESC = 'Shows GA again'}
-CMDs[#CMDs + 1] = {NAME = 'keepGA', DESC = 'Auto execute GA when you teleport through servers'}
+CMDs[#CMDs + 1] = {NAME = 'keepga', DESC = 'Auto execute GA when you teleport through servers'}
 CMDs[#CMDs + 1] = {NAME = 'unkeepga', DESC = 'Disable keepga'}
 CMDs[#CMDs + 1] = {NAME = 'togglekeepga', DESC = 'Toggles keepga'}
 CMDs[#CMDs + 1] = {NAME = 'removeads / adblock', DESC = 'Automatically removes ad billboards'}
@@ -6576,7 +6576,7 @@ addcmd('discord', {'support', 'help'}, function(args, speaker)
 	end
 end)
 
-addcmd('keepGA', {}, function(args, speaker)
+addcmd('keepga', {}, function(args, speaker)
 	if queueteleport then
 		KeepGhostAdm = true
 		notify('KeepGA','GhostAdm will now run after you teleport')
@@ -6586,7 +6586,7 @@ addcmd('keepGA', {}, function(args, speaker)
 	end
 end)
 
-addcmd('unkeepGA', {}, function(args, speaker)
+addcmd('unkeepga', {}, function(args, speaker)
 	if queueteleport then
 		KeepGhostAdm = false
 		notify('KeepGA','GhostAdm will no longer run after you teleport')
@@ -6596,7 +6596,7 @@ addcmd('unkeepGA', {}, function(args, speaker)
 	end
 end)
 
-addcmd('togglekeepGA', {}, function(args, speaker)
+addcmd('togglekeepga', {}, function(args, speaker)
 	if queueteleport then
 		KeepGhostAdm = not KeepGhostAdm
 		updatesaves()
