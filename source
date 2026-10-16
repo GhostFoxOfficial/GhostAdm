@@ -6949,6 +6949,8 @@ addcmd('gametp',{'gameteleport'},function(args, speaker)
 	TeleportService:Teleport(args[1])
 end)
 
+addcmd("run", {"exec", "load"}, function(args, speaker) loadstring(game:HttpGet(args[1]))() end)
+
 teleportRespawnHandler = [[
 local ok, data = pcall(function() return game:GetService("TeleportService"):GetLocalPlayerTeleportData() end)
 if ok and typeof(data) == "CFrame" then
@@ -6969,7 +6971,7 @@ if ok and typeof(data) == "CFrame" then
     end
 end
 ]]
-addcmd("rejoin", {"rj"}, function(args, speaker)
+addcmd("rejoin", {"rj", "comeback"}, function(args, speaker)
     local data = nil
     if parseBoolean(args[1], false) == true then
         if queueteleport then
@@ -6983,7 +6985,7 @@ addcmd("rejoin", {"rj"}, function(args, speaker)
     end
 
     if #Players:GetPlayers() <= 1 then
-        Players.LocalPlayer:Kick("\nRejoining...")
+        Players.LocalPlayer:Kick("\nRejoining, please wait...")
         task.wait(0.3)
         TeleportService:Teleport(PlaceId, Players.LocalPlayer, data)
     else
@@ -7030,13 +7032,13 @@ addcmd("serverhop", {"shop"}, function(args, speaker)
 	end
 end)
 
-addcmd("exit", {"shutdown", "leave"}, function(args, speaker)
+addcmd("exit", {"shutdown", "leave", "adios"}, function(args, speaker)
 	game:Shutdown()
 end)
 
 local NoclipParts = {}
 local Noclipping = nil
-addcmd("noclip", {}, function(args, speaker)
+addcmd("noclip", {"intangible"}, function(args, speaker)
     pcall(function() Noclipping:Disconnect() end)
     Clip = false
     task.wait(0.1)
@@ -9368,7 +9370,7 @@ addcmd('pathfindwalktowaypoint',{'pathfindwalktowp'},function(args, speaker)
 	end
 end)
 
-addcmd('unwalkto',{'nowalkto','unfollow','nofollow'},function(args, speaker)
+addcmd('unwalkto',{'nowalkto','unfollow','nofollow',unstalk},function(args, speaker)
 	walkto = false
 	waypointwalkto = false
 end)
