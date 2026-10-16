@@ -359,7 +359,7 @@ Title.BorderSizePixel = 0
 Title.Size = UDim2.new(0, 250, 0, 20)
 Title.Font = Enum.Font.SourceSans
 Title.TextSize = 18
-Title.Text = "GhostAdm FE v" .. currentVersion
+Title.Text = "GhostAdm v" .. currentVersion
 
 do
 	local emoji = ({
@@ -1609,7 +1609,7 @@ PluginsHint.Position = UDim2.new(0, 25, 0, 40)
 PluginsHint.Size = UDim2.new(0, 200, 0, 50)
 PluginsHint.Font = Enum.Font.SourceSansItalic
 PluginsHint.TextSize = 16
-PluginsHint.Text = "Download plugins from the GA Discord (discord.gg/78ZuWSq)"
+PluginsHint.Text = "Download plugins from the GA Discord (discord.gg/ajhNv5PSpN)"
 PluginsHint.TextColor3 = Color3.new(1, 1, 1)
 PluginsHint.TextStrokeColor3 = Color3.new(1, 1, 1)
 PluginsHint.TextWrapped = true
