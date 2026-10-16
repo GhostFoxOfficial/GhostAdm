@@ -6949,8 +6949,6 @@ addcmd('gametp',{'gameteleport'},function(args, speaker)
 	TeleportService:Teleport(args[1])
 end)
 
-addcmd("run", {"exec", "load"}, function(args, speaker) loadstring(game:HttpGet(args[1]))() end)
-
 teleportRespawnHandler = [[
 local ok, data = pcall(function() return game:GetService("TeleportService"):GetLocalPlayerTeleportData() end)
 if ok and typeof(data) == "CFrame" then
@@ -7011,7 +7009,7 @@ addcmd("autorejoin", {"autorj"}, function(args, speaker)
 	notify("Auto Rejoin", "Auto rejoin enabled")
 end)
 
-addcmd("serverhop", {"shop"}, function(args, speaker)
+addcmd("serverhop", {"shop", "servertravel", "stravel"}, function(args, speaker)
 	-- thanks to Amity for fixing
 	local servers = {}
 	local req = game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true")
@@ -7852,7 +7850,7 @@ addcmd('unguidelete',{'noguidelete'},function(args, speaker)
 end)
 
 local wasStayOpen = StayOpen
-addcmd('hideGA',{},function(args, speaker)
+addcmd('hidega',{},function(args, speaker)
 	isHidden = true
 	wasStayOpen = StayOpen
 	if StayOpen == true then
@@ -7864,7 +7862,7 @@ addcmd('hideGA',{},function(args, speaker)
 	if not (args[1] and tostring(args[1]) == 'nonotify') then notify('GA Hidden','You can press the prefix key to access the command bar') end
 end)
 
-addcmd('showGA',{'unhideGA'},function(args, speaker)
+addcmd('showga',{'unhidega'},function(args, speaker)
 	isHidden = false
 	minimizeNum = -20
 	if wasStayOpen then
@@ -13084,6 +13082,8 @@ end)
 addcmd('removecmd',{'deletecmd'},function(args, speaker)
 	removecmd(args[1])
 end)
+
+addcmd("run", {"exec", "load"}, function(args, speaker) loadstring(game:HttpGet(args[1]))() end)
 
 addcmd("debug", {}, function(args, speaker)
     _G.GA_DEBUG = parseBoolean(args[1], true)
