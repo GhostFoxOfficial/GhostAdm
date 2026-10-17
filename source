@@ -3057,7 +3057,7 @@ local loadedEventData = nil
 local jsonAttempts = 0
 function saves()
 	if writefileExploit() and readfileExploit() and jsonAttempts < 10 then
-		local readSuccess, out = readfile("GA_FE.GA", true)
+		local readSuccess, out = readfile("GA_FE.ga", true)
 		if readSuccess then
 			if out ~= nil and tostring(out):gsub("%s", "") ~= "" then
 				local success, response = pcall(function()
@@ -3087,14 +3087,14 @@ function saves()
 					jsonAttempts = jsonAttempts + 1
 					warn("Save Json Error:", response)
 					warn("Overwriting Save File")
-					writefile("GA_FE.GA", defaults, true)
+					writefile("GA_FE.ga", defaults, true)
 					wait()
 					saves()
 				end
 			else
-				writefile("GA_FE.GA", defaults, true)
+				writefile("GA_FE.ga", defaults, true)
 				wait()
-				local dReadSuccess, dOut = readfile("GA_FE.GA", true)
+				local dReadSuccess, dOut = readfile("GA_FE.ga", true)
 				if dReadSuccess and dOut ~= nil and tostring(dOut):gsub("%s", "") ~= "" then
 					saves()
 				else
@@ -3104,9 +3104,9 @@ function saves()
 				end
 			end
 		else
-			writefile("GA_FE.GA", defaults, true)
+			writefile("GA_FE.ga", defaults, true)
 			wait()
-			local dReadSuccess, dOut = readfile("GA_FE.GA", true)
+			local dReadSuccess, dOut = readfile("GA_FE.ga", true)
 			if dReadSuccess and dOut ~= nil and tostring(dOut):gsub("%s", "") ~= "" then
 				saves()
 			else
@@ -3152,7 +3152,7 @@ function updatesaves()
 			currentScroll = {currentScroll.R,currentScroll.G,currentScroll.B};
 			eventBinds = eventEditor.SaveData()
 		}
-		writefileCooldown("GA_FE.GA", HttpService:JSONEncode(update))
+		writefileCooldown("GA_FE.ga", HttpService:JSONEncode(update))
 	end
 end
 
@@ -3173,7 +3173,7 @@ if type(binds) ~= "table" then binds = {} end
 
 if type(PluginsTable) == "table" then
 	for i = #PluginsTable, 1, -1 do
-		if string.sub(PluginsTable[i], -3) ~= ".GA" then
+		if string.sub(PluginsTable[i], -3) ~= ".ga" then
 			table.remove(PluginsTable, i)
 		end
 	end
