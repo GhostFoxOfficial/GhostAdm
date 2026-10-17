@@ -13229,52 +13229,6 @@ addcmd("syscolor", {"systemcolor"}, function(args, speaker)
 	notify("System Color", "Set to "..bc.Name.." ("..sysColor:ToHex()..")")
 end)
 
-addcmd("fireallremotes", {"fireall", "fireallre"}, function(args, speaker)
-	local values = parseValues(args)
-	local remotes = collectRemotes({"RemoteEvent", "UnreliableRemoteEvent"})
-	notify("Fire All Remotes", "Firing "..#remotes.." remote events...")
-	fireList(remotes, values, "Fire All Remotes")
-end)
-
-addcmd("firere", {"fireremote", "fireremotes"}, function(args, speaker)
-	if not args[1] then
-		notify("Fire Remote", "Usage: ;firere <name> [args]")
-		return
-	end
-	local values = parseValues(args, 2)
-	local matched = {}
-	for _, r in ipairs(collectRemotes({"RemoteEvent", "UnreliableRemoteEvent"})) do
-		if nameMatches(r, args[1]) then table.insert(matched, r) end
-	end
-	notify("Fire Remote", "Matched "..#matched.." remote(s)")
-	fireList(matched, values, "Fire Remote")
-end)
-
-addcmd("invokeallremotes", {"invokeall", "fireallrf"}, function(args, speaker)
-	local values = parseValues(args)
-	local remotes = collectRemotes("RemoteFunction")
-	if #remotes == 0 then
-		notify("Invoke All", "No RemoteFunctions found")
-		return
-	end
-
-	notify("Invoke All", "Invoking "..#remotes.." remote functions...")
-	local done, failed = 0, 0
-
-	for _, rf in ipairs(remotes) do
-		local remote = rf
-		task.spawn(function()
-			local ok = pcall(function() return remote:InvokeServer(table.unpack(values)) end)
-			if ok then done = done + 1 else failed = failed + 1 end
-		end)
-		if fireDelay > 0 then task.wait(fireDelay) end
-	end
-
-	task.wait(1)
-	notify("Invoke All",
-		string.format("Returned %d | Errored %d | Pending %d", done, failed, #remotes - done - failed), 8)
-end)
-
 addcmd("debug", {}, function(args, speaker)
     _G.GA_DEBUG = parseBoolean(args[1], true)
     return _G.GA_DEBUG and "Enabled" or "Disabled"
