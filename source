@@ -13196,7 +13196,7 @@ addcmd('globalsystemchat', {'gsc', 'broadcast', 'globalsyschat'}, function(args,
 
     task.spawn(function()
         -- F-F-For global system chat, you need Firebase database
-        local firebase_url = "https://ghostadm-27c57-default-rtdb.firebaseio.com/" 
+        local firebase_url = "https://ghostadm-27c57-default-rtdb.firebaseio.com/broadcast.json" 
         
         -- Payload
         local payload = HttpService:JSONEncode({
@@ -13224,7 +13224,7 @@ task.spawn(function()
     
     local lastCheckedId = nil
     local checkInterval = 7 -- Checked every 7 seconds to balance latency with rate limit caution
-    local firebase_url = "https://ghostadm-27c57-default-rtdb.firebaseio.com/"
+    local firebase_url = "https://ghostadm-27c57-default-rtdb.firebaseio.com/broadcast.json"
 
     while task.wait(checkInterval) do
         pcall(function()
