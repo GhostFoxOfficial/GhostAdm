@@ -13201,12 +13201,12 @@ addcmd('globalsystemchat', {'gsc', 'broadcast', 'globalsyschat'}, function(args,
         -- Payload
         local payload = HttpService:JSONEncode({
             message = "[GLOBAL ALERT] " .. msg,
-            id = HttpService:GenerateGUID(false) -- Acts as a unique message fingerprint
+            id = HttpService:GenerateGUID(false)
         })
         
         local response = httprequest({
             Url = firebase_url,
-            Method = "PUT", -- PUT overwrites the single current broadcast node to save space
+            Method = "PUT", -- PUT ov-overwrites the single current broadcast node to save space
             Headers = {["Content-Type"] = "application/json"},
             Body = payload
         })
