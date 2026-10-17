@@ -4543,6 +4543,7 @@ CMDs[#CMDs + 1] = {NAME = 'syscolor / systemcolor [color]', DESC = 'Sets the def
 CMDs[#CMDs + 1] = {NAME = 'serverstats / svstats', DESC = 'Shows FPS, ping, memory, part count, and player count'}
 CMDs[#CMDs + 1] = {NAME = 'sound / playsound [id] [volume] [pitch]', DESC = 'Plays an audio id at your character'}
 CMDs[#CMDs + 1] = {NAME = 'stopsound / stopsounds', DESC = 'Stops every sound started with the sound command'}
+CMDs[#CMDs + 1] = {NAME = 'globalsystemchat / gsc / broadcast / globalsyschat [message]', DESC = 'Broadcast a message across servers who use GhostAdm'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
