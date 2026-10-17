@@ -3057,7 +3057,7 @@ local loadedEventData = nil
 local jsonAttempts = 0
 function saves()
 	if writefileExploit() and readfileExploit() and jsonAttempts < 10 then
-		local readSuccess, out = readfile("GA_FE.ga", true)
+		local readSuccess, out = readfile("GA.ga", true)
 		if readSuccess then
 			if out ~= nil and tostring(out):gsub("%s", "") ~= "" then
 				local success, response = pcall(function()
@@ -3087,14 +3087,14 @@ function saves()
 					jsonAttempts = jsonAttempts + 1
 					warn("Save Json Error:", response)
 					warn("Overwriting Save File")
-					writefile("GA_FE.ga", defaults, true)
+					writefile("GA.ga", defaults, true)
 					wait()
 					saves()
 				end
 			else
-				writefile("GA_FE.ga", defaults, true)
+				writefile("GA.ga", defaults, true)
 				wait()
-				local dReadSuccess, dOut = readfile("GA_FE.ga", true)
+				local dReadSuccess, dOut = readfile("GA.ga", true)
 				if dReadSuccess and dOut ~= nil and tostring(dOut):gsub("%s", "") ~= "" then
 					saves()
 				else
@@ -3104,9 +3104,9 @@ function saves()
 				end
 			end
 		else
-			writefile("GA_FE.ga", defaults, true)
+			writefile("GA.ga", defaults, true)
 			wait()
-			local dReadSuccess, dOut = readfile("GA_FE.ga", true)
+			local dReadSuccess, dOut = readfile("GA.ga", true)
 			if dReadSuccess and dOut ~= nil and tostring(dOut):gsub("%s", "") ~= "" then
 				saves()
 			else
@@ -3152,7 +3152,7 @@ function updatesaves()
 			currentScroll = {currentScroll.R,currentScroll.G,currentScroll.B};
 			eventBinds = eventEditor.SaveData()
 		}
-		writefileCooldown("GA_FE.ga", HttpService:JSONEncode(update))
+		writefileCooldown("GA.ga", HttpService:JSONEncode(update))
 	end
 end
 
@@ -6310,7 +6310,7 @@ end)
 PluginsGUI = PluginEditor.background
 
 function addPlugin(name)
-	if name:lower() == 'plugin file name' or name:lower() == 'GA_fe.ga' or name == 'GA_fe' then
+	if name:lower() == 'plugin file name' or name:lower() == 'GA.ga' or name == 'GA' then
 		notify('Plugin Error','Please enter a valid plugin')
 	else
 		local file
@@ -13070,7 +13070,7 @@ addcmd("addallplugins", {"loadallplugins"}, function(args, speaker)
 		local fileName = filePath:match("([^/\\]+%.ga)$")
 
 		if fileName and
-			fileName:lower() ~= "GA_fe.ga" and
+			fileName:lower() ~= "GA.ga" and
 			not isfolder(fileName) and
 			not table.find(PluginsTable, fileName)
 		then
