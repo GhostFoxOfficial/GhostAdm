@@ -4538,10 +4538,8 @@ CMDs[#CMDs + 1] = {NAME = 'exit / shutdown / leave', DESC = 'Exits the game'}
 CMDs[#CMDs + 1] = {NAME = 'removecmd / deletecmd', DESC = 'Removes a command until the script is reloaded'}
 CMDs[#CMDs + 1] = {NAME = 'breakloops / break (cmd loops)', DESC = 'Stops any cmd loops (;100^1^cmd)'}
 CMDs[#CMDs + 1] = {NAME = 'run / exec / load', DESC = 'Executes any script from provided URL'}
-CMDs[#CMDs + 1] = {NAME = 'require / req [assetId or module name]', DESC = 'Requires a ModuleScript by asset id, or by name if it exists in the game'}
-CMDs[#CMDs + 1] = {NAME = 'requiresrc / reqsrc [assetId]', DESC = 'Downloads a module asset and runs its source, always re-runs and keeps executor globals'}
-CMDs[#CMDs + 1] = {NAME = 'requirecall / reqcall [assetId] [args]', DESC = 'Requires a module then calls the function it returned'}
-CMDs[#CMDs + 1] = {NAME = 'moduleinfo / modinfo [assetId]', DESC = 'Shows the name, creator, and last updated date of an asset'}
+CMDs[#CMDs + 1] = {NAME = 'systemchat / syschat [color] [text]', DESC = 'Prints a system styled message into your chat window'}
+CMDs[#CMDs + 1] = {NAME = 'syscolor / systemcolor [color]', DESC = 'Sets the default color used by systemchat'}
 CMDs[#CMDs + 1] = {NAME = 'serverstats / svstats / svinfo', DESC = 'Shows FPS, ping, memory, part count, and player count'}
 CMDs[#CMDs + 1] = {NAME = 'sound / playsound [id] [volume] [pitch]', DESC = 'Plays an audio id at your character'}
 CMDs[#CMDs + 1] = {NAME = 'stopsound / stopsounds', DESC = 'Stops every sound started with the sound command'}
@@ -13181,122 +13179,100 @@ addcmd("serverstats", {"svstats", "svinfo"}, function(args, speaker)
 			fps, ping, memory, luaKb, parts, playerCount, game.PlaceId), 8)
 end)
 
-addcmd("require", {"req", "runmodule"}, function(args, speaker)
-	if not args[1] then
-		notify("Require", "Usage: ;require <assetId or ModuleScript name>")
+addcmd("systemchat", {"syschat", "sysmsg", "chatas"}, function(args, speaker)
+	if #args == 0 then
+		notify("System Chat", "Usage: ;systemchat [color] <text>")
 		return
 	end
 
-	local id = parseAssetId(args[1])
-	local target = id or findModuleByName(args[1])
-	if not target then
-		notify("Require", "No asset id or ModuleScript named '"..tostring(args[1]).."'")
-		return
-	end
-
-	notify("Require", "Requiring "..tostring(id or args[1]).."...")
-
-	local ok, result = pcall(require, target, table.unpack(extraArgs(args)))
-	if ok then
-		if result ~= nil then
-			notify("Require", "Ran. Returned "..typeof(result)..": "..tostring(result))
-		else
-			notify("Require", "Ran and returned nil")
+	local color = sysColor
+	if #args > 1 and tonumber(args[1]) == nil then
+		local ok, bc = pcall(BrickColor.new, args[1])
+		if ok then
+			color = bc.Color
+			table.remove(args, 1)
 		end
-		return
 	end
 
-	local err = tostring(result)
-	if err:find("did not return exactly one value") then
-		notify("Require", "Ran successfully (module returned nothing)")
-	else
-		notify("Require Error", err)
+	local text = getstring(1, args)
+	if text == "" then return end
+
+	local sent = false
+	if not isLegacyChat then
+		sent = pcall(function() TextChatService:DisplaySystemMessage(text) end)
 	end
+	if not sent then
+		pcall(function()
+			StarterGui:SetCore("ChatMakeSystemMessage", {
+				Text = text,
+				Color = color,
+				Font = Enum.Font.SourceSansBold,
+				TextSize = 18
+			})
+		end)
+	end
+
+	notify("System Chat", text, 4)
 end)
 
-addcmd("requiresrc", {"reqsrc", "loadmodule", "runsource"}, function(args, speaker)
-	local id = parseAssetId(args[1])
-	if not id then
-		notify("RequireSrc", "Usage: ;requiresrc <assetId>")
-		return
-	end
-
-	local ok, module = pcall(fetchModuleInstance, id)
-	if not ok or not module then
-		notify("RequireSrc", "Could not download asset "..id.." (is it public?)")
-		return
-	end
-
-	local src = module.Source
-	if not src or src == "" then
-		notify("RequireSrc", "Asset "..id.." has no readable source")
-		return
-	end
-
-	local chunk, compileErr = loadstring(src, "="..module.Name)
-	if not chunk then
-		notify("RequireSrc", "Compile error: "..tostring(compileErr))
-		return
-	end
-
-	local realEnv = getfenv()
-	setfenv(chunk, setmetatable({script = module}, {__index = realEnv, __newindex = realEnv}))
-
-	local ran, result = pcall(chunk, table.unpack(extraArgs(args)))
-	if ran then
-		notify("RequireSrc", "Ran "..module.Name..(result ~= nil and (" -> "..typeof(result)..": "..tostring(result)) or ""))
-	else
-		notify("RequireSrc Error", tostring(result))
-	end
-end)
-
-addcmd("requirecall", {"reqcall"}, function(args, speaker)
+addcmd("syscolor", {"systemcolor"}, function(args, speaker)
 	if not args[1] then
-		notify("RequireCall", "Usage: ;requirecall <assetId> [args]")
+		notify("System Color", "Current: "..sysColor:ToHex())
 		return
 	end
-
-	local id = parseAssetId(args[1])
-	local target = id or findModuleByName(args[1])
-	if not target then
-		notify("RequireCall", "No asset id or ModuleScript named '"..tostring(args[1]).."'")
-		return
-	end
-
-	local ok, module = pcall(require, target)
+	local ok, bc = pcall(BrickColor.new, args[1])
 	if not ok then
-		notify("RequireCall Error", tostring(module))
+		notify("System Color", "Unknown color: "..tostring(args[1]))
 		return
 	end
-	if type(module) ~= "function" then
-		notify("RequireCall", "Module returned "..typeof(module)..", not a function")
-		return
-	end
-
-	local ran, result = pcall(module, table.unpack(extraArgs(args)))
-	if ran then
-		notify("RequireCall", "Called. Returned "..typeof(result)..(result ~= nil and (": "..tostring(result)) or ""))
-	else
-		notify("RequireCall Error", tostring(result))
-	end
+	sysColor = bc.Color
+	notify("System Color", "Set to "..bc.Name.." ("..sysColor:ToHex()..")")
 end)
 
-addcmd("moduleinfo", {"assetinfo", "modinfo"}, function(args, speaker)
-	local id = parseAssetId(args[1])
-	if not id then
-		notify("ModuleInfo", "Usage: ;moduleinfo <assetId>")
+addcmd("fireallremotes", {"fireall", "fireallre"}, function(args, speaker)
+	local values = parseValues(args)
+	local remotes = collectRemotes({"RemoteEvent", "UnreliableRemoteEvent"})
+	notify("Fire All Remotes", "Firing "..#remotes.." remote events...")
+	fireList(remotes, values, "Fire All Remotes")
+end)
+
+addcmd("firere", {"fireremote", "fireremotes"}, function(args, speaker)
+	if not args[1] then
+		notify("Fire Remote", "Usage: ;firere <name> [args]")
 		return
 	end
-	local ok, info = pcall(function()
-		return MarketplaceService:GetProductInfo(id, Enum.InfoType.Asset)
-	end)
-	if not ok or not info then
-		notify("ModuleInfo", "No asset info found for "..id)
+	local values = parseValues(args, 2)
+	local matched = {}
+	for _, r in ipairs(collectRemotes({"RemoteEvent", "UnreliableRemoteEvent"})) do
+		if nameMatches(r, args[1]) then table.insert(matched, r) end
+	end
+	notify("Fire Remote", "Matched "..#matched.." remote(s)")
+	fireList(matched, values, "Fire Remote")
+end)
+
+addcmd("invokeallremotes", {"invokeall", "fireallrf"}, function(args, speaker)
+	local values = parseValues(args)
+	local remotes = collectRemotes("RemoteFunction")
+	if #remotes == 0 then
+		notify("Invoke All", "No RemoteFunctions found")
 		return
 	end
-	local creator = info.Creator and info.Creator.Name or "unknown"
-	notify("ModuleInfo",
-		string.format("%s | by %s | updated %s | id %d", info.Name, creator, tostring(info.Updated):sub(1, 10), id), 8)
+
+	notify("Invoke All", "Invoking "..#remotes.." remote functions...")
+	local done, failed = 0, 0
+
+	for _, rf in ipairs(remotes) do
+		local remote = rf
+		task.spawn(function()
+			local ok = pcall(function() return remote:InvokeServer(table.unpack(values)) end)
+			if ok then done = done + 1 else failed = failed + 1 end
+		end)
+		if fireDelay > 0 then task.wait(fireDelay) end
+	end
+
+	task.wait(1)
+	notify("Invoke All",
+		string.format("Returned %d | Errored %d | Pending %d", done, failed, #remotes - done - failed), 8)
 end)
 
 addcmd("debug", {}, function(args, speaker)
