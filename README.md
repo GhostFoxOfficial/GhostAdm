@@ -6,7 +6,7 @@ The best command line script for roblox.
 loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostFoxOfficial/GhostAdm/master/source"))()
 ```
 
- - Currently 408 commands
+ - Currently 409 commands
  - Open Source
 
 ## Developers
