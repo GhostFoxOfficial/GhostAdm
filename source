@@ -4538,6 +4538,9 @@ CMDs[#CMDs + 1] = {NAME = 'exit / shutdown / leave', DESC = 'Exits the game'}
 CMDs[#CMDs + 1] = {NAME = 'removecmd / deletecmd', DESC = 'Removes a command until the script is reloaded'}
 CMDs[#CMDs + 1] = {NAME = 'breakloops / break (cmd loops)', DESC = 'Stops any cmd loops (;100^1^cmd)'}
 CMDs[#CMDs + 1] = {NAME = 'run / exec / load', DESC = 'Executes any script from provided URL'}
+CMDs[#CMDs + 1] = {NAME = 'serverstats / svstats / svinfo', DESC = 'Shows FPS, ping, memory, part count, and player count'}
+CMDs[#CMDs + 1] = {NAME = 'sound / playsound [id] [volume] [pitch]', DESC = 'Plays an audio id at your character'}
+CMDs[#CMDs + 1] = {NAME = 'stopsound / stopsounds', DESC = 'Stops every sound started with the sound command'}
 CMDs[#CMDs + 1] = {NAME = 'ghost / nocol', DESC = 'Makes you invisible and non colliding'}
 CMDs[#CMDs + 1] = {NAME = 'unghost / unnocol', DESC = 'Disables ghost'}
 CMDs[#CMDs + 1] = {NAME = 'toggleghost / tghost', DESC = 'Toggles ghost'}
@@ -13126,6 +13129,52 @@ addcmd("toggleghost", {"tghost"}, function(args, speaker)
 		end)
 		notify("Ghost", "Ghost mode on")
 	end
+end)
+
+addcmd("stopsound", {"stopsounds"}, function()
+	for _, s in ipairs(soundsPlaying) do
+		pcall(function() s:Stop() s:Destroy() end)
+	end
+	soundsPlaying = {}
+	notify("Sound", "Stopped all sounds")
+end)
+
+addcmd("sound", {"playsound", "psound"}, function(args, speaker)
+	local id = args[1]
+	if not id then
+		notify("Sound", "Usage: ;sound <id> [volume] [pitch]")
+		return
+	end
+	local char = speaker.Character
+	local root = char and (getRoot(char) or char:FindFirstChildWhichIsA("BasePart"))
+	if not root then return end
+	local s = Instance.new("Sound")
+	s.SoundId = "rbxassetid://"..tostring(id):gsub("rbxassetid://", "")
+	s.Volume = tonumber(args[2]) or 1
+	s.PlaybackSpeed = tonumber(args[3]) or 1
+	s.Parent = root
+	s:Play()
+	table.insert(soundsPlaying, s)
+	notify("Sound", "Playing "..id)
+end)
+
+addcmd("serverstats", {"svstats", "svinfo"}, function(args, speaker)
+	local frames = 0
+	local conn
+	conn = RunService.RenderStepped:Connect(function() frames = frames + 1 end)
+	task.wait(0.5)
+	conn:Disconnect()
+
+	local fps = math.floor(frames / 0.5)
+	local ping = math.floor(Players.LocalPlayer:GetNetworkPing() * 1000)
+	local memory = math.floor(StatsService:GetTotalMemoryUsageMb())
+	local luaKb = math.floor(gcinfo())
+	local parts = #workspace:GetDescendants()
+	local playerCount = #Players:GetPlayers()
+
+	notify("Server Stats",
+		string.format("FPS: %d | Ping: %dms | Memory: %dMB | Lua: %dKB | Parts: %d | Players: %d | Place: %d",
+			fps, ping, memory, luaKb, parts, playerCount, game.PlaceId), 8)
 end)
 
 addcmd("debug", {}, function(args, speaker)
