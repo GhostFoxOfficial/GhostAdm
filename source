@@ -13309,11 +13309,6 @@ addcmd("report", {}, function(args, speaker)
 		return
 	end
 
-	if type(Players.ReportAbuse) ~= "function" then
-		notify("Report", "Players:ReportAbuse is not available on this client")
-		return
-	end
-
 	local reason = resolveReason(args[2]) or "Cheating/Exploiting"
 	local commentStart = resolveReason(args[2]) and 3 or 2
 
@@ -13323,20 +13318,60 @@ addcmd("report", {}, function(args, speaker)
 		for i = commentStart, #args do table.insert(parts, args[i]) end
 		comment = table.concat(parts, " ")
 	end
+	if comment == "" then comment = "Reported via command" end
 
-	local sent, failed = 0, 0
-	for _, name in ipairs(getPlayer(args[1], speaker)) do
+	-- tries the legacy API, then the newer tagged API, collecting every error
+	local function attemptReport(plr)
+		local errors = {}
+
+		if type(Players.ReportAbuse) == "function" then
+			local ok, err = pcall(function() Players:ReportAbuse(plr, reason, comment) end)
+			if ok then return "ReportAbuse" end
+			table.insert(errors, "ReportAbuse: "..tostring(err))
+		else
+			table.insert(errors, "ReportAbuse: missing")
+		end
+
+		if type(Players.ReportAbuseV3) == "function" then
+			local tags = HttpService:JSONEncode({reason = reason, comments = {comment}})
+			local ok, err = pcall(function() Players:ReportAbuseV3(plr, tags) end)
+			if ok then return "ReportAbuseV3" end
+			table.insert(errors, "ReportAbuseV3: "..tostring(err))
+		else
+			table.insert(errors, "ReportAbuseV3: missing")
+		end
+
+		return nil, table.concat(errors, "\n")
+	end
+
+	local targets = getPlayer(args[1], speaker)
+	if #targets == 0 then
+		notify("Report", "No players found")
+		return
+	end
+
+	local sent, failed, lastError = 0, 0, nil
+	for _, name in ipairs(targets) do
 		local plr = Players:FindFirstChild(name)
 		if plr then
-			local ok = pcall(function() Players:ReportAbuse(plr, reason, comment) end)
-			if ok then sent = sent + 1 else failed = failed + 1 end
-			if sent % 5 == 0 then task.wait() end
+			local used, err = attemptReport(plr)
+			if used then
+				sent = sent + 1
+				notify("Report", "Sent "..name.." via "..used, 4)
+			else
+				failed = failed + 1
+				lastError = err
+			end
+			task.wait(0.1)
 		end
 	end
 
 	notify("Report", string.format("Reported %d player(s) for %s%s", sent, reason,
 		#comment > 0 and (" - "..comment) or ""), 8)
-	if failed > 0 then notify("Report", failed.." failed") end
+
+	if failed > 0 then
+		notify("Report Error ("..failed..")", (lastError or "unknown"):sub(1, 160), 15)
+	end
 end)
 
 addcmd('skybox', {'changesky', 'sky'}, function(args, speaker)
