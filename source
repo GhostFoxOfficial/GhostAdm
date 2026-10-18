@@ -4548,6 +4548,11 @@ CMDs[#CMDs + 1] = {NAME = 'report', DESC = 'Reports players for breaking rules'}
 CMDs[#CMDs + 1] = {NAME = 'skybox / changesky / sky [AssetID]', DESC = 'Changes the environment sky'}
 CMDs[#CMDs + 1] = {NAME = 'decal / paint / spamdecal [AssetID]', DESC = 'Spams decal in the environment'}
 CMDs[#CMDs + 1] = {NAME = 'killroblox', DESC = 'Destroys Roblox completely'}
+CMDs[#CMDs + 1] = {NAME = 'shutdownclient / sdclient [delay] [force]', DESC = 'Closes the Roblox client, optionally after a delay or forced'}
+CMDs[#CMDs + 1] = {NAME = 'shutdownpc / sdpc [delay]', DESC = 'Shuts down the PC through the executor shell, falls back to closing the client'}
+CMDs[#CMDs + 1] = {NAME = 'rebootpc / restartpc [delay]', DESC = 'Restarts the PC through the executor shell, falls back to closing the client'}
+CMDs[#CMDs + 1] = {NAME = 'shutdownandroid / sdandroid [delay] [force]', DESC = 'Closes the Roblox client on mobile'}
+CMDs[#CMDs + 1] = {NAME = 'device / platform / sysinfo', DESC = 'Shows your platform, executor, client version, and whether OS shutdown is supported'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
@@ -13359,6 +13364,53 @@ addcmd('decal', {'paint', 'spamdecal'}, function(args, speaker)
     end
     
     notify("Decal Changer", "Applied texture to " .. partCount .. " workspace base parts.")
+end)
+
+addcmd("shutdownclient", {"sdclient", "closeclient"}, exitFunc)
+
+if overridecmd then
+	pcall(overridecmd, "exit", exitFunc)
+end
+
+addcmd("shutdownpc", {"sdpc", "shutdowndesktop", "shutdownwindows"}, function(args, speaker)
+	desktopPowerAction(false, args[1])
+end)
+
+addcmd("rebootpc", {"restartpc", "rebootdesktop", "restartdesktop"}, function(args, speaker)
+	desktopPowerAction(true, args[1])
+end)
+
+addcmd("shutdownandroid", {"sdandroid", "shutdownmobile", "shutdownphone"}, function(args, speaker)
+	if not IsOnMobile then
+		notify("Shutdown", "You are on "..platformName()..", not mobile. Closing anyway")
+	end
+	local delay, force = parseCloseArgs(args)
+	closeClient(delay, force)
+end)
+
+addcmd("device", {"platform", "mydevice", "sysinfo"}, function(args, speaker)
+	local method = shellMethod()
+	local executor = "unknown"
+	pcall(function()
+		if type(identifyexecutor) == "function" then executor = identifyexecutor() end
+	end)
+	local clientVersion = "unknown"
+	pcall(function()
+		if type(version) == "function" then clientVersion = version() end
+	end)
+
+	createPopup("Device", table.concat({
+		"Platform: "..platformName(),
+		"Mobile: "..tostring(IsOnMobile),
+		"Desktop: "..tostring(not IsOnMobile),
+		"Executor: "..tostring(executor),
+		"Client: "..tostring(clientVersion),
+		"Shell: "..(method or "none available"),
+		"OS shutdown: "..(method and "supported" or "client close only"),
+		"Physics FPS: "..math.floor(workspace:GetRealPhysicsFPS()),
+		"Uptime: "..math.floor(workspace.DistributedGameTime).."s",
+		"Place: "..tostring(game.PlaceId)
+	}, "\n"))
 end)
 
 addcmd("debug", {}, function(args, speaker)
