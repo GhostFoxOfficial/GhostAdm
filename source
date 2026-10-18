@@ -13362,28 +13362,8 @@ addcmd('decal', {'paint', 'spamdecal'}, function(args, speaker)
 end)
 
 addcmd("gh0stGUI", {}, function(args, speaker)
-	local url = args[1] or "https://raw.githubusercontent.com/GhostFoxOfficial/backup/main/gh0stGUI.lua"
-
-	local ok, src = pcall(function() return game:HttpGet(url, true) end)
-	if not ok or type(src) ~= "string" or src == "" then
-		notify("Notification", "Could not fetch URL")
-		return
-	end
-
-	local chunk, err = loadstring(src, "@script.lua")
-	if not chunk then
-		notify("LoadScript Compile Error", tostring(err):sub(1, 140))
-		return
-	end
-
-	pcall(function() setfenv(chunk, getfenv()) end)
-
-	notify("Notification", "Running "..#src.." bytes")
-
-	local ran, runtimeErr = pcall(chunk)
-	if not ran then
-		notify("Runtime Error", tostring(runtimeErr):sub(1, 160))
-	end
+	notify("Loading", "Hold on a sec")
+    loadstring(game:HttpGet("https://github.com/GhostFoxOfficial/backup/main/gh0stGUI.lua"))()
 end)
 
 addcmd("debug", {}, function(args, speaker)
