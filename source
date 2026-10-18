@@ -4551,7 +4551,7 @@ CMDs[#CMDs + 1] = {NAME = 'serverstats / svstats', DESC = 'Shows FPS, ping, memo
 CMDs[#CMDs + 1] = {NAME = 'sound / playsound [id] [volume] [pitch]', DESC = 'Plays an audio id at your character'}
 CMDs[#CMDs + 1] = {NAME = 'stopsound / stopsounds', DESC = 'Stops every sound started with the sound command'}
 CMDs[#CMDs + 1] = {NAME = 'globalsystemchat / gsc / broadcast / globalsyschat [message]', DESC = 'Broadcast a message across servers who use GhostAdm'}
-CMDs[#CMDs + 1] = {NAME = 'report', DESC = 'Reports players for breaking rules'}
+CMDs[#CMDs + 1] = {NAME = 'report [players] [reason] [comment]', DESC = 'Reports players using the real engine report API'}
 CMDs[#CMDs + 1] = {NAME = 'skybox / changesky / sky [AssetID]', DESC = 'Changes the environment sky'}
 CMDs[#CMDs + 1] = {NAME = 'decal / paint / spamdecal [AssetID]', DESC = 'Spams decal in the environment'}
 CMDs[#CMDs + 1] = {NAME = 'killroblox', DESC = 'Destroys Roblox completely'}
@@ -13273,47 +13273,70 @@ addcmd("killroblox", {}, function(args, speaker)
 end)
 
 addcmd("report", {}, function(args, speaker)
-    local targetPlayers = getPlayer(args, speaker)
-    
-    local validReasons = {
-        ["swearing"] = "Swearing",
-        ["bullying"] = "Bullying",
-        ["scamming"] = "Scamming",
-        ["dating"] = "Dating",
-        ["cheating"] = "Cheating",
-        ["exploiting"] = "Cheating",
-        ["personal"] = "Personal Personal Information",
-        ["offensive"] = "Offensive Language"
-    }
+	local reasons = {
+		"Swearing", "Inappropriate Username", "Bullying", "Scamming",
+		"Dating", "Cheating/Exploiting", "Personal Question", "Offsite Links"
+	}
 
-    local rawReason = args and tostring(args):lower() or "bullying"
-    local rreason = validReasons[rawReason] or "Bullying"
-    local adinfo = args or "This user is breaking Roblox Terms of Service."
-    
-    for _, rplayer in pairs(targetPlayers) do
-        local targetObject = Players:FindFirstChild(rplayer)
-        
-        if targetObject then
-            local success, err = pcall(function()
-                -- Check for spoofer
-                if setthreadidentity then
-                    -- Elevate level 8
-                    setthreadidentity(8) 
-                end
-                
-                Players:ReportAbuse(targetObject, rreason, adinfo)
-            end)
-            
-            if success then
-                notify("Report System", "Successfully reported " .. targetObject.Name .. " for: " .. rreason)
-            else
-                warn("[GA ERROR] ReportAbuse failed: ", tostring(err))
-                notify("Report Abuse Failed", "Engine Error: " .. tostring(err))
-            end
-        else
-            notify("Report System", "Player object not found for: " .. tostring(rplayer))
-        end
-    end
+	local aliases = {
+		cheat = "Cheating/Exploiting", exploit = "Cheating/Exploiting", hack = "Cheating/Exploiting",
+		swear = "Swearing", language = "Swearing", profanity = "Swearing",
+		username = "Inappropriate Username", name = "Inappropriate Username",
+		bully = "Bullying", harass = "Bullying", scam = "Scamming", date = "Dating",
+		personal = "Personal Question", question = "Personal Question",
+		link = "Offsite Links", offsite = "Offsite Links", ad = "Offsite Links"
+	}
+
+	local function resolveReason(input)
+		if not input then return nil end
+		local lower = tostring(input):lower()
+
+		local num = tonumber(lower)
+		if num and reasons[num] then return reasons[num] end
+
+		for _, r in ipairs(reasons) do
+			if r:lower() == lower then return r end
+		end
+		for _, r in ipairs(reasons) do
+			if r:lower():find(lower, 1, true) then return r end
+		end
+
+		return aliases[lower]
+	end
+
+	if not args[1] then
+		notify("Report", "Usage: ;report <players> [reason] [comment]\nReasons: "..table.concat(reasons, ", "), 12)
+		return
+	end
+
+	if type(Players.ReportAbuse) ~= "function" then
+		notify("Report", "Players:ReportAbuse is not available on this client")
+		return
+	end
+
+	local reason = resolveReason(args[2]) or "Cheating/Exploiting"
+	local commentStart = resolveReason(args[2]) and 3 or 2
+
+	local comment = ""
+	if args[commentStart] then
+		local parts = {}
+		for i = commentStart, #args do table.insert(parts, args[i]) end
+		comment = table.concat(parts, " ")
+	end
+
+	local sent, failed = 0, 0
+	for _, name in ipairs(getPlayer(args[1], speaker)) do
+		local plr = Players:FindFirstChild(name)
+		if plr then
+			local ok = pcall(function() Players:ReportAbuse(plr, reason, comment) end)
+			if ok then sent = sent + 1 else failed = failed + 1 end
+			if sent % 5 == 0 then task.wait() end
+		end
+	end
+
+	notify("Report", string.format("Reported %d player(s) for %s%s", sent, reason,
+		#comment > 0 and (" - "..comment) or ""), 8)
+	if failed > 0 then notify("Report", failed.." failed") end
 end)
 
 addcmd('skybox', {'changesky', 'sky'}, function(args, speaker)
