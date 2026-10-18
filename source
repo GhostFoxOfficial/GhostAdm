@@ -13261,17 +13261,29 @@ addcmd("killroblox", {}, function(args, speaker)
 end)
 
 addcmd("report", {}, function(args, speaker)
-    players = getPlayer(args[1], speaker)
-    for _, rplayer in pairs(players) do
-        local rreason = args[2] or "Bullying"
-        local adinfo = args[3] or "He is breaking Roblox TOS."
+    -- R-Report uses native Roblox reporting system
+    local targetPlayers = getPlayer(args[1], speaker)
+    
+    -- Misc
+    local rreason = args[2] or "Bullying"
+    local adinfo = args[3] or "He is breaking Roblox TOS."
+    
+    for _, rplayer in pairs(targetPlayers) do
+        -- Find the actual player object via the string names returned by getPlayer
+        local targetObject = Players:FindFirstChild(rplayer)
         
-        local success, err = pcall(function()
-            Players:ReportAbuse(game.Players[rplayer], rreason, adinfo)
-        end)
-        
-        if not success then
-            notify("Report Abuse Failed", "Failed to report " .. tostring(rplayer) .. ". Error: " .. tostring(err))
+        if targetObject then
+            local success, err = pcall(function()
+                Players:ReportAbuse(targetObject, rreason, adinfo)
+            end)
+            
+            if success then
+                notify("Report System", "Successfully reported " .. targetObject.Name .. " for: " .. rreason)
+            else
+                notify("Report Abuse Failed", "Error processing report for " .. targetObject.Name)
+            end
+        else
+            notify("Report System", "Player object not found for: " .. tostring(rplayer))
         end
     end
 end)
