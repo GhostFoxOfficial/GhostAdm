@@ -1,3 +1,10 @@
+if setthreadidentity then
+    setthreadidentity(8)
+elseif setidentity then
+    setidentity(8)
+elseif set_thread_identity then
+    set_thread_identity(8)
+end
 if GA_LOADED and not _G.GA_DEBUG then
 	-- error("GhostAdm is already running!", 0)
 	return
@@ -13288,8 +13295,8 @@ addcmd("report", {}, function(args, speaker)
             local success, err = pcall(function()
                 -- Check for spoofer
                 if setthreadidentity then
-                    -- Elevate level 7
-                    setthreadidentity(7) 
+                    -- Elevate level 8
+                    setthreadidentity(8) 
                 end
                 
                 Players:ReportAbuse(targetObject, rreason, adinfo)
