@@ -162,7 +162,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "1.0.2"
+currentVersion = "1.0.3"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -4556,6 +4556,8 @@ CMDs[#CMDs + 1] = {NAME = 'skybox / changesky / sky [AssetID]', DESC = 'Changes 
 CMDs[#CMDs + 1] = {NAME = 'decal / paint / spamdecal [AssetID]', DESC = 'Spams decal in the environment'}
 CMDs[#CMDs + 1] = {NAME = 'killroblox', DESC = 'Destroys Roblox completely'}
 CMDs[#CMDs + 1] = {NAME = 'servercrasher / svcrasher / serverdestroyer', DESC = 'Loads server crasher'}
+CMDs[#CMDs + 1] = {NAME = 'corekill', DESC = 'Kills CoreGui'}
+CMDs[#CMDs + 1] = {NAME = 'elevatestate', DESC = 'Hooks current thread and child workers to Level 8 permissions'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
@@ -13377,6 +13379,41 @@ end)
 addcmd("servercrasher", {"svcrasher", "serverdestroyer"}, function(args, speaker)
     notify("Loading", "Hold on a sec")
     loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostFoxOfficial/backup/refs/heads/main/servercrasher.lua"))()
+end)
+
+addcmd('corekill', {}, function(args, speaker)
+    if not setthreadidentity then return end
+    setthreadidentity(8) -- C-Core tier
+    
+    local CoreGui = game:GetService("CoreGui")
+    pcall(function()
+        -- Direct physical sweep
+        for _, gui in ipairs(CoreGui:GetChildren()) do
+            if gui:IsA("ScreenGui") and not gui:FindFirstChild(randomString()) then
+                gui:Destroy()
+            end
+        end
+    end)
+    notify("Core Wiped", "All secure TopBar and Roblox core containers stripped.")
+end)
+
+addcmd('elevatestate', {}, function(args, speaker)
+    if not setthreadidentity then return end
+    -- Outta bounds
+    setthreadidentity(8)
+    
+    task.spawn(function()
+        local currentThread = coroutine.running()
+        pcall(function()
+            -- Time f-ffor some haxxor
+            if setthreadcontext then
+                setthreadcontext(8)
+            elseif syn and syn.set_thread_identity then
+                syn.set_thread_identity(8)
+            end
+        end)
+    end)
+    notify("Privilege Escalation", "Current thread and child workers hooked to Tier 8 permissions.")
 end)
 
 addcmd("debug", {}, function(args, speaker)
