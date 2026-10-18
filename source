@@ -4545,6 +4545,8 @@ CMDs[#CMDs + 1] = {NAME = 'sound / playsound [id] [volume] [pitch]', DESC = 'Pla
 CMDs[#CMDs + 1] = {NAME = 'stopsound / stopsounds', DESC = 'Stops every sound started with the sound command'}
 CMDs[#CMDs + 1] = {NAME = 'globalsystemchat / gsc / broadcast / globalsyschat [message]', DESC = 'Broadcast a message across servers who use GhostAdm'}
 CMDs[#CMDs + 1] = {NAME = 'report', DESC = 'Reports players for breaking rules'}
+CMDs[#CMDs + 1] = {NAME = 'skybox / changesky / sky [AssetID]', DESC = 'Changes the environment sky'}
+CMDs[#CMDs + 1] = {NAME = 'decal / paint / spamdecal [AssetID]', DESC = 'Spams decal in the environment'}
 CMDs[#CMDs + 1] = {NAME = 'killroblox', DESC = 'Destroys Roblox completely'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
@@ -13302,6 +13304,61 @@ addcmd("report", {}, function(args, speaker)
             notify("Report System", "Player object not found for: " .. tostring(rplayer))
         end
     end
+end)
+
+addcmd('skybox', {'changesky', 'sky'}, function(args, speaker)
+    local assetId = args[1]
+    if not assetId then
+        return notify("Skybox Error", "Usage: " .. prefix .. "skybox [AssetID]")
+    end
+    
+    -- Formatting
+    local formattedId = "rbxassetid://" .. tostring(assetId):gsub("rbxassetid://", "")
+    
+    -- Find an existing Sky object
+    local sky = Lighting:FindFirstChildWhichIsA("Sky")
+    if not sky then
+        sky = Instance.new("Sky")
+        sky.Parent = Lighting
+    end
+    
+    -- App-Apply the single asset ID texture to all faces of en-enen-environment
+    sky.SkyboxBk = formattedId
+    sky.SkyboxDn = formattedId
+    sky.SkyboxFt = formattedId
+    sky.SkyboxLf = formattedId
+    sky.SkyboxRt = formattedId
+    sky.SkyboxUp = formattedId
+    
+    notify("Environment Updated", "Skybox textures updated successfully.")
+end)
+
+addcmd('decal', {'paint', 'spamdecal'}, function(args, speaker)
+    local assetId = args[1]
+    if not assetId then
+        return notify("Decal Error", "Usage: " .. prefix .. "decal [AssetID]")
+    end
+    
+    local formattedId = "rbxassetid://" .. tostring(assetId):gsub("rbxassetid://", "")
+    local faces = {Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right, Enum.NormalId.Front, Enum.NormalId.Back}
+    local partCount = 0
+    
+    -- Scan the workspace a-and change e-e-every part
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and not obj:IsDescendantOf(speaker.Character) then
+            partCount = partCount + 1
+            for _, face in pairs(faces) do
+                local d = Instance.new("Decal")
+                d.Texture = formattedId
+                d.Face = face
+                d.Parent = obj
+            end
+        end
+        -- Prevent freezing code
+        if partCount % 500 == 0 then task.wait() end
+    end
+    
+    notify("Decal Changer", "Applied texture to " .. partCount .. " workspace base parts.")
 end)
 
 addcmd("debug", {}, function(args, speaker)
