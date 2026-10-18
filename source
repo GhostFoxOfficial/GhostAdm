@@ -4544,9 +4544,6 @@ CMDs[#CMDs + 1] = {NAME = 'serverstats / svstats', DESC = 'Shows FPS, ping, memo
 CMDs[#CMDs + 1] = {NAME = 'sound / playsound [id] [volume] [pitch]', DESC = 'Plays an audio id at your character'}
 CMDs[#CMDs + 1] = {NAME = 'stopsound / stopsounds', DESC = 'Stops every sound started with the sound command'}
 CMDs[#CMDs + 1] = {NAME = 'globalsystemchat / gsc / broadcast / globalsyschat [message]', DESC = 'Broadcast a message across servers who use GhostAdm'}
-CMDs[#CMDs + 1] = {NAME = 'vulnspatch / vpatcher / vulnspatcher', DESC = 'Patches any vulnerabilities'}
-CMDs[#CMDs + 1] = {NAME = 'vulnscheck / vulns / vuln', DESC = 'Checks for vulnerabilities'}
-CMDs[#CMDs + 1] = {NAME = 'identitytest / testidentity / validateidentity', DESC = 'Tests the identity'}
 CMDs[#CMDs + 1] = {NAME = 'report', DESC = 'Reports players for breaking rules'}
 CMDs[#CMDs + 1] = {NAME = 'killroblox', DESC = 'Destroys Roblox completely'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
@@ -13264,7 +13261,7 @@ addcmd("killroblox", {}, function(args, speaker)
 end)
 
 addcmd("report", {}, function(args, speaker)
-    local players = getPlayer(args[1], speaker)
+    players = getPlayer(args[1], speaker)
     for _, rplayer in pairs(players) do
         local rreason = args[2] or "Bullying"
         local adinfo = args[3] or "He is breaking Roblox TOS."
@@ -13277,29 +13274,6 @@ addcmd("report", {}, function(args, speaker)
             notify("Report Abuse Failed", "Failed to report " .. tostring(rplayer) .. ". Error: " .. tostring(err))
         end
     end
-end)
-
-addcmd("identitytest", {'testidentity', 'validateidentity'}, function(args, speaker)
-    loadstring(__IYRHttpGet("https://raw.githubusercontent.com/InfernusScripts/Executor-Tests/refs/heads/main/Identity/Test.lua"))()
-    notify("Identity Test", 'Check console for more details (F9)')
-end)
-
-addcmd("vulnspatch",{'vpatcher','vulnspatcher'},function(args, speaker)
-    loadstring(__IYRHttpGet("https://github.com/FurryBoyYT/moreunc/raw/main/vulnpatch"))()
-
-  -- vuln patch
-   local old = writefile
-   getgenv().writefile = function(a, b)
-      a = a:gsub(":(/+)", "_")
-      old(a, b)
-   end
-
-    notify("Patching some vulns")
-end)
-
-addcmd("vulnscheck",{"vulns","vuln"},function()
-    loadstring(__IYRHttpGet("https://github.com/FurryBoyYT/moreunc/raw/main/vulntestsource"))()
-    notify("Check console", "Press F9 or type /console in chat to see results")
 end)
 
 addcmd("debug", {}, function(args, speaker)
