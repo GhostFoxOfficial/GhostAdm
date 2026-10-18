@@ -13261,9 +13261,8 @@ addcmd("killroblox", {}, function(args, speaker)
 end)
 
 addcmd("report", {}, function(args, speaker)
-    local targetPlayers = getPlayer(args[1], speaker)
+    local targetPlayers = getPlayer(args, speaker)
     
-    -- Roblox report categories
     local validReasons = {
         ["swearing"] = "Swearing",
         ["bullying"] = "Bullying",
@@ -13275,25 +13274,27 @@ addcmd("report", {}, function(args, speaker)
         ["offensive"] = "Offensive Language"
     }
 
-    -- De-De-Default to "Bullying" if a valid category isn't provided or recognized
-    local rawReason = args[2] and tostring(args[2]):lower() or "bullying"
+    local rawReason = args and tostring(args):lower() or "bullying"
     local rreason = validReasons[rawReason] or "Bullying"
-    
-    -- Third argument
-    local adinfo = args[3] or "This user is breaking Roblox Terms of Service."
+    local adinfo = args or "This user is breaking Roblox Terms of Service."
     
     for _, rplayer in pairs(targetPlayers) do
         local targetObject = Players:FindFirstChild(rplayer)
         
         if targetObject then
             local success, err = pcall(function()
+                -- Check for spoofer
+                if setthreadidentity then
+                    -- Elevate level 7
+                    setthreadidentity(7) 
+                end
+                
                 Players:ReportAbuse(targetObject, rreason, adinfo)
             end)
             
             if success then
                 notify("Report System", "Successfully reported " .. targetObject.Name .. " for: " .. rreason)
             else
-                -- If n-nnot worked, it p-prints exact engine error
                 warn("[GA ERROR] ReportAbuse failed: ", tostring(err))
                 notify("Report Abuse Failed", "Engine Error: " .. tostring(err))
             end
