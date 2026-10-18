@@ -5,6 +5,7 @@ elseif setidentity then
 elseif set_thread_identity then
     set_thread_identity(8)
 end
+
 if GA_LOADED and not _G.GA_DEBUG then
 	-- error("GhostAdm is already running!", 0)
 	return
@@ -13320,7 +13321,7 @@ addcmd("report", {}, function(args, speaker)
 	end
 	if comment == "" then comment = "Reported via command" end
 
-	-- tries the legacy API, then the newer tagged API, collecting every error
+	-- Attempting legacy API
 	local function attemptReport(plr)
 		local errors = {}
 
