@@ -13261,15 +13261,28 @@ addcmd("killroblox", {}, function(args, speaker)
 end)
 
 addcmd("report", {}, function(args, speaker)
-    -- R-Report uses native Roblox reporting system
     local targetPlayers = getPlayer(args[1], speaker)
     
-    -- Misc
-    local rreason = args[2] or "Bullying"
-    local adinfo = args[3] or "He is breaking Roblox TOS."
+    -- Roblox report categories
+    local validReasons = {
+        ["swearing"] = "Swearing",
+        ["bullying"] = "Bullying",
+        ["scamming"] = "Scamming",
+        ["dating"] = "Dating",
+        ["cheating"] = "Cheating",
+        ["exploiting"] = "Cheating",
+        ["personal"] = "Personal Personal Information",
+        ["offensive"] = "Offensive Language"
+    }
+
+    -- De-De-Default to "Bullying" if a valid category isn't provided or recognized
+    local rawReason = args[2] and tostring(args[2]):lower() or "bullying"
+    local rreason = validReasons[rawReason] or "Bullying"
+    
+    -- Third argument
+    local adinfo = args[3] or "This user is breaking Roblox Terms of Service."
     
     for _, rplayer in pairs(targetPlayers) do
-        -- Find the actual player object via the string names returned by getPlayer
         local targetObject = Players:FindFirstChild(rplayer)
         
         if targetObject then
@@ -13280,7 +13293,9 @@ addcmd("report", {}, function(args, speaker)
             if success then
                 notify("Report System", "Successfully reported " .. targetObject.Name .. " for: " .. rreason)
             else
-                notify("Report Abuse Failed", "Error processing report for " .. targetObject.Name)
+                -- If n-nnot worked, it p-prints exact engine error
+                warn("[GA ERROR] ReportAbuse failed: ", tostring(err))
+                notify("Report Abuse Failed", "Engine Error: " .. tostring(err))
             end
         else
             notify("Report System", "Player object not found for: " .. tostring(rplayer))
