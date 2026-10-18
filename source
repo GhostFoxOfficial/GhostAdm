@@ -13363,7 +13363,7 @@ end)
 
 addcmd("gh0stGUI", {}, function(args, speaker)
 	notify("Loading", "Hold on a sec")
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostFoxOfficial/backup/main/gh0stGUI.lua"))() 
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostFoxOfficial/backup/refs/heads/main/gh0stGUI.lua"))() 
 end)
 
 addcmd("debug", {}, function(args, speaker)
