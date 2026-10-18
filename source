@@ -4,6 +4,8 @@ elseif setidentity then
     setidentity(8)
 elseif set_thread_identity then
     set_thread_identity(8)
+elseif set_thread_context(8) then
+    set_thread_context(8)
 end
 
 if GA_LOADED and not _G.GA_DEBUG then
