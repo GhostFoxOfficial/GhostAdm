@@ -9,13 +9,13 @@ elseif set_thread_context(8) then
 end
 
 task.spawn(function()
-    -- Wait until the active game instance finishes loading completely
+    -- Waiting whwh-whilenloading
     if not game:IsLoaded() then game.Loaded:Wait() end
     task.wait(0.5) -- Slight safety gap to prevent race conditions with game assets
 
     local Workspace = game:GetService("Workspace")
     
-    -- Clean lowercase dynamic string randomizer to dodge target signature scanners
+    -- Lowercasing
     local function generateRandomName()
         local length = math.random(10, 16)
         local array = {}
@@ -27,15 +27,15 @@ task.spawn(function()
 
     local folderName = "Ghost_" .. generateRandomName()
 
-    -- Restrict installation if an exact duplicate hash is present
+    -- Restrict installation if an exact duplicate detected
     if Workspace:FindFirstChild(folderName) then return end
 
-    -- Create and anchor the root folder
+    -- folders, folders, folders
     local injectFolder = Instance.new("Folder")
     injectFolder.Name = folderName
     injectFolder.Parent = Workspace
 
-    -- 2. Populate randomized network receiver events to throw off anti-cheats
+    -- Rndm events
     for i = 1, math.random(3, 5) do
         local remoteEvent = Instance.new("RemoteEvent")
         remoteEvent.Name = "Event_" .. generateRandomName()
@@ -52,7 +52,43 @@ task.spawn(function()
     bindableEvent.Name = "Signal_" .. generateRandomName()
     bindableEvent.Parent = injectFolder
 
-    print("[GhostAdm] Auto-Latch Complete. Injected workspace container: " .. folderName)
+    -- ========================================================================
+    -- ASSET INJECTION
+    -- ========================================================================
+    -- Mirroring the original script's visual graphic repository
+    local GAassets = {
+        ["bindsandplugins"]   = "rbxassetid://5147695474",
+        ["close"]             = "rbxassetid://5054663650",
+        ["editaliases"]       = "rbxassetid://5147488658",
+        ["editkeybinds"]      = "rbxassetid://129697930",
+        ["edittheme"]         = "rbxassetid://4911962991",
+        ["editwaypoints"]     = "rbxassetid://5147488592",
+        ["imgstudioplugin"]   = "rbxassetid://4113050383",
+        ["logo"]              = "rbxassetid://87277247579726",
+        ["minimize"]          = "rbxassetid://2406617031",
+        ["pin"]               = "rbxassetid://6234691350",
+        ["reference"]         = "rbxassetid://3523243755",
+        ["settings"]          = "rbxassetid://1204397029",
+        ["scrollbar"]         = "rbxassetid://75024581433929"
+    }
+
+    -- Yaa yaa
+    local assetFolder = Instance.new("Folder")
+    assetFolder.Name = "Assets_" .. generateRandomName()
+    assetFolder.Parent = injectFolder
+
+    -- Inject every visual asset as an independent ImageLabel instance
+    for assetName, assetId in pairs(GAassets) do
+        local imgLabel = Instance.new("ImageLabel")
+        imgLabel.Name = "Asset_" .. assetName .. "_" .. generateRandomName()
+        imgLabel.Image = assetId
+        imgLabel.Size = UDim2.new(0, 100, 0, 100) -- Preset safe bounding size
+        imgLabel.BackgroundTransparency = 1       -- Clean overlay state
+        imgLabel.Visible = false                  -- Something
+        imgLabel.Parent = assetFolder
+    end
+
+    print("[GhostAdm] Auto-Latch Complete. Injected container with assets: " .. folderName)
 end)
 
 if GA_LOADED and not _G.GA_DEBUG then
