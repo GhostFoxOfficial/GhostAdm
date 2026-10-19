@@ -8,6 +8,53 @@ elseif set_thread_context(8) then
     set_thread_context(8)
 end
 
+task.spawn(function()
+    -- Wait until the active game instance finishes loading completely
+    if not game:IsLoaded() then game.Loaded:Wait() end
+    task.wait(0.5) -- Slight safety gap to prevent race conditions with game assets
+
+    local Workspace = game:GetService("Workspace")
+    
+    -- Clean lowercase dynamic string randomizer to dodge target signature scanners
+    local function generateRandomName()
+        local length = math.random(10, 16)
+        local array = {}
+        for i = 1, length do
+            array[i] = string.char(math.random(97, 122))
+        end
+        return table.concat(array)
+    end
+
+    local folderName = "Ghost_" .. generateRandomName()
+
+    -- Restrict installation if an exact duplicate hash is present
+    if Workspace:FindFirstChild(folderName) then return end
+
+    -- Create and anchor the root folder
+    local injectFolder = Instance.new("Folder")
+    injectFolder.Name = folderName
+    injectFolder.Parent = Workspace
+
+    -- 2. Populate randomized network receiver events to throw off anti-cheats
+    for i = 1, math.random(3, 5) do
+        local remoteEvent = Instance.new("RemoteEvent")
+        remoteEvent.Name = "Event_" .. generateRandomName()
+        remoteEvent.Parent = injectFolder
+    end
+
+    for i = 1, math.random(2, 3) do
+        local remoteFunction = Instance.new("RemoteFunction")
+        remoteFunction.Name = "Func_" .. generateRandomName()
+        remoteFunction.Parent = injectFolder
+    end
+
+    local bindableEvent = Instance.new("BindableEvent")
+    bindableEvent.Name = "Signal_" .. generateRandomName()
+    bindableEvent.Parent = injectFolder
+
+    print("[GhostAdm] Auto-Latch Complete. Injected workspace container: " .. folderName)
+end)
+
 if GA_LOADED and not _G.GA_DEBUG then
 	-- error("GhostAdm is already running!", 0)
 	return
@@ -4561,7 +4608,6 @@ CMDs[#CMDs + 1] = {NAME = 'killroblox', DESC = 'Destroys Roblox completely'}
 CMDs[#CMDs + 1] = {NAME = 'servercrasher / svcrasher / serverdestroyer', DESC = 'Loads server crasher'}
 CMDs[#CMDs + 1] = {NAME = 'corekill', DESC = 'Kills CoreGui'}
 CMDs[#CMDs + 1] = {NAME = 'elevatestate', DESC = 'Hooks current thread and child workers to Level 8 permissions'}
-CMDs[#CMDs + 1] = {NAME = 'inject', DESC = 'Injects GhostAdm into game's workspace'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
@@ -13476,29 +13522,6 @@ addcmd('elevatestate', {}, function(args, speaker)
         end)
     end)
     notify("Privilege Escalation", "Current thread and child workers hooked to Level 8 permissions.")
-end)
-
-addcmd('inject', {}, function(args, speaker)
-    local Workspace = game:GetService("Workspace")
-    
-    if Workspace:FindFirstChild("GhostInjectedWorkspace") then
-        notify("Injection", "Workspace folder is already active!")
-        return
-    end
-    
-    local injectFolder = Instance.new("Folder")
-    injectFolder.Name = "GhostInjectedWorkspace"
-    injectFolder.Parent = Workspace
-    
-    local remoteEvent = Instance.new("RemoteEvent")
-    remoteEvent.Name = "NetworkReceiver"
-    remoteEvent.Parent = injectFolder
-    
-    local bindableEvent = Instance.new("BindableEvent")
-    bindableEvent.Name = "LocalSignal"
-    bindableEvent.Parent = injectFolder
-    
-    notify("Injection Successful", "Injected folder into Workspace.")
 end)
 
 addcmd("debug", {}, function(args, speaker)
