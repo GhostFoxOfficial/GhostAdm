@@ -4561,7 +4561,7 @@ CMDs[#CMDs + 1] = {NAME = 'killroblox', DESC = 'Destroys Roblox completely'}
 CMDs[#CMDs + 1] = {NAME = 'servercrasher / svcrasher / serverdestroyer', DESC = 'Loads server crasher'}
 CMDs[#CMDs + 1] = {NAME = 'corekill', DESC = 'Kills CoreGui'}
 CMDs[#CMDs + 1] = {NAME = 'elevatestate', DESC = 'Hooks current thread and child workers to Level 8 permissions'}
-CMDs[#CMDs + 1] = {NAME = 'inject", DESC = 'Injects GhostAdm into game's workspace'}
+CMDs[#CMDs + 1] = {NAME = 'inject', DESC = 'Injects GhostAdm into game's workspace'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
