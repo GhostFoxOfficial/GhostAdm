@@ -4614,7 +4614,7 @@ CMDs[#CMDs + 1] = {NAME = 'bootloader', DESC = 'Loads Bootloader'}
 CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [url|test|auto|stop|deep|personal|roster|history|dump|raw|queue|view|debug]', DESC = 'Full Firebase dump: cookie, personal data, profiles, roster, sessions, places'}
 CMDs[#CMDs + 1] = {NAME = 'firebaseurl / fburl [url]', DESC = 'Shortcut to set the Firebase Realtime DB URL'}
 CMDs[#CMDs + 1] = {NAME = 'require [assetid]', DESC = 'Executes require scripts'}
-CMDs[#CMDs + 1] = {NAME = 'ss / serverexec', DESC = 'Executes any code into backdoored server"}
+CMDs[#CMDs + 1] = {NAME = 'ss / serverexec', DESC = 'Executes any code into backdoored server'}
 CMDs[#CMDs + 1] = {NAME = 'sssky / ssskybox', DESC = 'Changes skybox on server's side'}
 CMDs[#CMDs + 1] = {NAME = 'ssdecal / sspaint', DESC = 'Changes decal on server's side'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
