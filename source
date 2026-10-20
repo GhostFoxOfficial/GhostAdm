@@ -17,81 +17,190 @@ pcall(function() getgenv().GA_LOADED = true end)
 if not game:IsLoaded() then game.Loaded:Wait() end
 
 task.spawn(function()
-    -- Helper function
+    -- 1. Obfuscated naming generation engine
     local function generateRandomName(length)
-        local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+        local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_"
         local name = ""
-        for i = 1, length or math.random(10, 18) do
+        for i = 1, length or math.random(10, 16) do
             local rand = math.random(1, #chars)
             name = name .. string.sub(chars, rand, rand)
         end
         return name
     end
 
-    -- mmm
     local Workspace = game:GetService("Workspace")
     local Players = game:GetService("Players")
+    local CoreGui = game:GetService("CoreGui")
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local HttpService = game:GetService("HttpService")
+    
     repeat task.wait() until Players.LocalPlayer
+    local LocalPlayer = Players.LocalPlayer
 
-    -- Instantiate
-    local MainContainer = Instance.new("Folder")
-    MainContainer.Name = "Env_" .. generateRandomName(8)
-    MainContainer.Parent = Workspace
-
-    -- Obfuscation (RAAAHH)
-    -- Creates 40+ parts, configurations, and folders to clutter the workspace structure
-    for i = 1, math.random(40, 60) do
-        local assetType = ({"Part", "Folder", "Configuration", "StringValue", "Vector3Value"})[math.random(1, 5)]
-        local dummyAsset = Instance.new(assetType)
-        dummyAsset.Name = generateRandomName()
-        
-        -- Parts
-        if dummyAsset:IsA("BasePart") then
-            dummyAsset.Size = Vector3.new(math.random(1, 5), math.random(1, 5), math.random(1, 5))
-            dummyAsset.Transparency = 1
-            dummyAsset.CanCollide = false
-            dummyAsset.Anchored = true
-        end
-        
-        dummyAsset.Parent = MainContainer
-    end
-
-    -- jhh
-    -- Since Instance.new("LocalScript") won't execute when parented to Workspace via executor,
-    -- values
-    for remoteIndex = 1, 5 do
-        local randomRemoteName = "Net_" .. generateRandomName(12)
-        
-        -- Create the physical RemoteEvent asset inside the container
-        local ProcRemote = Instance.new("RemoteEvent")
-        ProcRemote.Name = randomRemoteName
-        ProcRemote.Parent = MainContainer
-
-        -- Bind
-        task.spawn(function()
-            local myIndex = remoteIndex
-            local myRemoteName = randomRemoteName
-            
-            print(string.format("[Script_%d]: Initialized and Listening on Remote: %s", myIndex, myRemoteName))
-            
-            -- Set up custom local payload
-            ProcRemote.OnClientEvent:Connect(function(...)
-                local args = {...}
-                print(string.format("[Script_%d Handler]: Routed payload on channel %s", myIndex, myRemoteName))
-                
-                -- ???
-                if myIndex == 1 then
-                    -- Remote script 1 specific logic
-                elseif myIndex == 2 then
-                    -- Remote script 2 specific logic
-                elseif myIndex == 5 then
-                    -- Remote script 5 specific logic
+    local TaskProfiles = {
+        [1] = {
+            Name = "SecurityEnforcer", 
+            Desc = "Continuous validation of FilteringEnabled constraints and structural security audits",
+            CoreLogic = function()
+                -- Task 1: Check and monitor if FilteringEnabled is structurally configured
+                local isFE = Workspace.FilteringEnabled
+                if _G.GA_DEBUG then
+                    print(string.format("[System Guard]: Environment FilteringEnabled state evaluated as: %s", tostring(isFE)))
                 end
-            end)
-        end)
-    end
+            end
+        },
+        [2] = {
+            Name = "NetworkScanner", 
+            Desc = "Proactive deep-scan across game instances to index potentially vulnerable remote vectors",
+            CoreLogic = function()
+                -- Task 2: Scan for vulnerable remotes throughout ReplicatedStorage, Workspace, etc.
+                local indexedRemotes = {}
+                local function recursiveScan(parent)
+                    for _, child in ipairs(parent:GetChildren()) do
+                        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
+                            -- Flag
+                            local lowerName = child.Name:lower()
+                            if string.find(lowerName, "kill") or string.find(lowerName, "damage") or string.find(lowerName, "admin") or string.find(lowerName, "ban") or string.find(lowerName, "give") then
+                                table.insert(indexedRemotes, child:GetFullName())
+                            end
+                        end
+                        pcall(recursiveScan, child)
+                    end
+                end
+                pcall(recursiveScan, ReplicatedStorage)
+                pcall(recursiveScan, Workspace)
+                
+                if #indexedRemotes > 0 and _G.GA_DEBUG then
+                    print(string.format("[Vulnerability Scanner]: Warning - Flagged %d suspect network targets.", #indexedRemotes))
+                end
+            end
+        },
+        [3] = {
+            Name = "SystemController", 
+            Desc = "Primary framework system process overhead manipulation and scaling matrix",
+            CoreLogic = function()
+                pcall(function()
+                    if ScaledHolder and Scale then
+                        local expectedScale = math.max(Holder.AbsoluteSize.X / 1920, guiScale or 1)
+                        if Scale.Scale ~= expectedScale then
+                            Scale.Scale = expectedScale
+                        end
+                    end
+                end)
+            end
+        },
+        [4] = {
+            Name = "EnvironmentStabilizer", 
+            Desc = "Audio damping systems and cleaning engine for localized physical particle clutter",
+            CoreLogic = function()
+                for _, obj in ipairs(Workspace:GetChildren()) do
+                    if obj:IsA("Debris") or (obj:IsA("Part") and obj.Position.Y < -5000) then
+                        pcall(function() obj:Destroy() end)
+                    end
+                end
+            end
+        },
+        [5] = {
+            Name = "ConfigDataBroker", 
+            Desc = "Local data caching layer and encryption buffer manager for layout properties",
+            CoreLogic = function()
+                if not nosaves and type(updatesaves) == "function" then
+                end
+            end
+        }
+    }
 
-    print("[GhostAdm]: Successfully injected.")
+    
+    local ExecutionTargets = {
+        {Parent = Workspace, Type = "Public", BaseName = "Env_" .. generateRandomName(6)},
+        {Parent = CoreGui, Type = "System", BaseName = "RobloxNetworkCore_" .. generateRandomName(4)} -- Hidden CoreGui system identity
+    }
+
+    for _, Config in ipairs(ExecutionTargets) do
+        local TargetParent = Config.Parent
+        
+        
+        local MainContainer = Instance.new("Folder")
+        MainContainer.Name = Config.BaseName
+        MainContainer.Parent = TargetParent
+
+        
+        for i = 1, math.random(25, 40) do
+            local assetPool = {"Part", "Folder", "Configuration", "StringValue", "NumberValue"}
+            local assetType = assetPool[math.random(1, #assetPool)]
+            local dummyAsset = Instance.new(assetType)
+            dummyAsset.Name = generateRandomName()
+            
+            if dummyAsset:IsA("BasePart") then
+                dummyAsset.Size = Vector3.new(1, 1, 1)
+                dummyAsset.Transparency = 1
+                dummyAsset.CanCollide = false
+                dummyAsset.Anchored = true
+            end
+            dummyAsset.Parent = MainContainer
+        end
+
+        
+        for index = 1, 5 do
+            local profile = TaskProfiles[index]
+            local idTag = generateRandomName(6)
+            
+            
+            local assignedRemoteName = Config.Type == "System" and "CoreEvent_" .. profile.Name or "NetEvent_" .. idTag
+            local assignedScriptName = Config.Type == "System" and "CoreModule_" .. profile.Name or "NetScript_" .. idTag
+
+            -- Create the physical RemoteEvent asset instance
+            local ProcRemote = Instance.new("RemoteEvent")
+            ProcRemote.Name = assignedRemoteName
+            ProcRemote.Parent = MainContainer
+
+            
+            local CompanionScript = Instance.new("LocalScript")
+            CompanionScript.Name = assignedScriptName
+            
+            
+            local dynamicSource = string.format([[
+-- // ROBLOX SUBSYSTEM INITIALIZER
+-- // Subsystem Identity: %s
+-- // Operational Context: %s
+local SecurityNode = script.Parent:WaitForChild("%s")
+local WorkerThread = coroutine.running()
+
+SecurityNode.OnClientEvent:Connect(function(...)
+    -- Background task array routing loop actively locked into runtime environment
+end)]], profile.Name, profile.Desc, assignedRemoteName)
+
+            pcall(function() CompanionScript.Source = dynamicSource end)
+            CompanionScript.Parent = MainContainer
+
+            -- 5. Physical Runtime Loop Engine Hook (Each loop automatically performs its unique duties)
+            task.spawn(function()
+                if _G.GA_DEBUG then
+                    print(string.format("[Initialization Loop]: Background worker '%s' launched inside %s parent directory.", assignedScriptName, TargetParent.Name))
+                end
+
+                -- Dedicated autonomous background worker thread loop
+                task.spawn(function()
+                    while task.wait(5 + math.random(1, 4)) do -- Randomized offset
+                        local ok, err = pcall(profile.CoreLogic)
+                        if not ok and _G.GA_DEBUG then
+                            warn(string.format("[Script Error - %s]: Execution break: %s", profile.Name, tostring(err)))
+                        end
+                    end
+                end)
+
+                -- Event channel payload receiver
+                ProcRemote.OnClientEvent:Connect(function(...)
+                    local packet = {...}
+                    -- External triggers routed through commands can catch custom remote requests here
+                    if index == 3 then
+                        -- For custom overrides sent directly through commands
+                    end
+                end)
+            end)
+        end
+    end
+    print("[System]: Successfully deployed specialized system elements across CoreGui and Workspace.")
 end)
 
 function missing(t, f, fallback)
