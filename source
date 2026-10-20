@@ -13,7 +13,7 @@ task.spawn(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
     task.wait(0.5) -- Slight gap to prevent race conditions with game assets
 
-    Workspace = game:GetService("Workspace")
+    local Workspace = game:GetService("Workspace")
     
     -- Lowercasing
     function generateRandomName()
@@ -25,13 +25,13 @@ task.spawn(function()
         return table.concat(array)
     end
 
-    folderName = "Ghost_" .. generateRandomName()
+    local folderName = "Ghost_" .. generateRandomName()
 
     -- Restrict in-installation if an exact duplicate detected
     if Workspace:FindFirstChild(folderName) then return end
 
     -- folders, folders, folders
-    injectFolder = Instance.new("Folder")
+    local injectFolder = Instance.new("Folder")
     injectFolder.Name = folderName
     injectFolder.Parent = Workspace
 
@@ -73,7 +73,7 @@ task.spawn(function()
     }
 
     -- Yaa yaa
-    assetFolder = Instance.new("Folder")
+    local assetFolder = Instance.new("Folder")
     assetFolder.Name = "Assets_" .. generateRandomName()
     assetFolder.Parent = injectFolder
 
