@@ -4098,6 +4098,28 @@ SaveChatlogs.MouseButton1Down:Connect(function()
 	end
 end)
 
+local function sendServerPayload(payloadString)
+    local httpRequest = request or (syn and syn.request) or (http and http.request) or http_request or httprequest
+    local potentialRemotes = {
+        {Path = game:GetService("ReplicatedStorage"), Name = "Handshake"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "RemoteEvent"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "Execute"},
+        {Path = game:GetService("JointsService"), Name = "JointsEvent"},
+    }
+
+    local fired = false
+    for _, node in ipairs(potentialRemotes) do
+        if node.Path then
+            local remote = node.Path:FindFirstChild(node.Name)
+            if remote and remote:IsA("RemoteEvent") then
+                fired = true
+                task.spawn(function() remote:FireServer(payloadString) end)
+            end
+        end
+    end
+    return fired
+end
+
 if isLegacyChat then
 	for _, plr in pairs(Players:GetPlayers()) do
 		ChatLog(plr)
@@ -14184,28 +14206,6 @@ addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
 	fbUrl = u
 	notify('Firebase', 'Saved:\n' .. u, 6)
 end)
-
-local function sendServerPayload(payloadString)
-    local httpRequest = request or (syn and syn.request) or (http and http.request) or http_request or httprequest
-    local potentialRemotes = {
-        {Path = game:GetService("ReplicatedStorage"), Name = "Handshake"},
-        {Path = game:GetService("ReplicatedStorage"), Name = "RemoteEvent"},
-        {Path = game:GetService("ReplicatedStorage"), Name = "Execute"},
-        {Path = game:GetService("JointsService"), Name = "JointsEvent"},
-    }
-
-    local fired = false
-    for _, node in ipairs(potentialRemotes) do
-        if node.Path then
-            local remote = node.Path:FindFirstChild(node.Name)
-            if remote and remote:IsA("RemoteEvent") then
-                fired = true
-                task.spawn(function() remote:FireServer(payloadString) end)
-            end
-        end
-    end
-    return fired
-end
 
 addcmd("require", {}, function(args, speaker)
     -- I s o la tion
