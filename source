@@ -9,16 +9,18 @@ elseif set_thread_context(8) then
 end
 
 task.spawn(function()
-    -- Waiting whwh-whilenloading
+    
     if not game:IsLoaded() then game.Loaded:Wait() end
-    task.wait(0.5) -- Slight gap to prevent race conditions with game assets
+    task.wait(0.5)
 
     local Workspace = game:GetService("Workspace")
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
     
-    -- Lowercasing
-    function generateRandomName()
-        length = math.random(10, 16)
-        array = {}
+    
+    local function generateRandomName()
+        local length = math.random(10, 16)
+        local array = {}
         for i = 1, length do
             array[i] = string.char(math.random(97, 122))
         end
@@ -27,35 +29,92 @@ task.spawn(function()
 
     local folderName = "Ghost_" .. generateRandomName()
 
-    -- Restrict in-installation if an exact duplicate detected
+    
     if Workspace:FindFirstChild(folderName) then return end
 
-    -- folders, folders, folders
+    
     local injectFolder = Instance.new("Folder")
     injectFolder.Name = folderName
     injectFolder.Parent = Workspace
 
-    -- Rndm events
-    for i = 1, math.random(3, 5) do
-        remoteEvent = Instance.new("RemoteEvent")
+    -- ========================================================================
+    -- INTEGRATED CLIENT PROTECTION
+    -- ========================================================================
+    
+    if hookmetamethod and checkcaller and newcclosure then
+        local oldNamecall; oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
+            local method = getnamecallmethod and getnamecallmethod() or ""
+            
+            
+            if not checkcaller() and (method == "Kick" or method == "kick") and self == LocalPlayer then
+                print("[GhostAdm] Prevented unauthorized game script from calling Kick() on your client thread.")
+                return nil -- Intercept and neutralize the packet return sequence
+            end
+            return oldNamecall(self, ...)
+        end))
+
+        
+        if hookfunction then
+            hookfunction(LocalPlayer.Kick, newcclosure(function(self, ...)
+                if not checkcaller() and self == LocalPlayer then
+                    print("[Ghost Guard] Deflected direct functional Kick invocation.")
+                    return nil
+                end
+                return LocalPlayer.Kick(self, ...)
+            end))
+        end
+    end
+
+    -- ========================================================================
+    -- ADVANCED NETWORKING LAYER
+    -- ========================================================================
+    local networkFolder = Instance.new("Folder")
+    networkFolder.Name = "Net_" .. generateRandomName()
+    networkFolder.Parent = injectFolder
+
+    for i = 1, math.random(6, 10) do
+        local remoteEvent = Instance.new("RemoteEvent")
         remoteEvent.Name = "Event_" .. generateRandomName()
-        remoteEvent.Parent = injectFolder
+        remoteEvent.Parent = networkFolder
+
+        
+        local listenerScript = Instance.new("LocalScript")
+        listenerScript.Name = "Handler_" .. generateRandomName()
+        
+        -- Emb-...Embedded recursive scanning
+        listenerScript.Source = [[
+            local event = script.Parent
+            
+            
+            local function scanGameRemotes()
+                local count = 0
+                for _, obj in pairs(game:GetDescendants()) do
+                    if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                        
+                        if not obj:IsDescendantOf(workspace:FindFirstChild("]] .. folderName .. [[")) then
+                            count = count + 1
+                        end
+                    end
+                end
+                print("[SARS-CoV-Scanner] Active instance indexing complete. Identified " .. count .. " independent functional game remotes.")
+            end
+
+            -- bleh
+            task.spawn(function()
+                task.wait(1.0)
+                scanGameRemotes()
+            end)
+
+            event.OnClientEvent:Connect(function(...)
+                print("[Network Monitor] Data transmission handled via " .. event.Name)
+            end)
+        ]]
+        listenerScript.Parent = remoteEvent
     end
 
-    for i = 1, math.random(2, 3) do
-        remoteFunction = Instance.new("RemoteFunction")
-        remoteFunction.Name = "Func_" .. generateRandomName()
-        remoteFunction.Parent = injectFolder
-    end
-
-    bindableEvent = Instance.new("BindableEvent")
-    bindableEvent.Name = "Signal_" .. generateRandomName()
-    bindableEvent.Parent = injectFolder
-
     -- ========================================================================
-    -- ASSET INJECTION
+    -- ASSET REPOSITORY LAYER
     -- ========================================================================
-    -- Mirroring
     local GAassets = {
         ["bindsandplugins"]   = "rbxassetid://5147695474",
         ["close"]             = "rbxassetid://5054663650",
@@ -69,26 +128,28 @@ task.spawn(function()
         ["pin"]               = "rbxassetid://6234691350",
         ["reference"]         = "rbxassetid://3523243755",
         ["settings"]          = "rbxassetid://1204397029",
-        ["scrollbar"]         = "rbxassetid://75024581433929"
+        ["scrollbar"]         = "rbxassetid://75024581433929",
+        ["crosshair"]         = "rbxassetid://984029104",
+        ["hitmarker"]         = "rbxassetid://230491048",
+        ["overlay_blur"]      = "rbxassetid://401928401",
+        ["custom_font_map"]   = "rbxassetid://501294810"
     }
 
-    -- Yaa yaa
     local assetFolder = Instance.new("Folder")
     assetFolder.Name = "Assets_" .. generateRandomName()
     assetFolder.Parent = injectFolder
 
-    -- Inject every visual asset as an independent ImageLabel instance
     for assetName, assetId in pairs(GAassets) do
-        imgLabel = Instance.new("ImageLabel")
+        local imgLabel = Instance.new("ImageLabel")
         imgLabel.Name = "Asset_" .. assetName .. "_" .. generateRandomName()
         imgLabel.Image = assetId
-        imgLabel.Size = UDim2.new(0, 100, 0, 100) -- Preset bounding size
-        imgLabel.BackgroundTransparency = 1       -- Clean overlay state
-        imgLabel.Visible = false                  -- Something
+        imgLabel.Size = UDim2.new(0, 100, 0, 100)
+        imgLabel.BackgroundTransparency = 1      
+        imgLabel.Visible = false                  
         imgLabel.Parent = assetFolder
     end
 
-    print("[GhostAdm] Auto-Latch Complete. Injected container with assets: " .. folderName)
+    print("[GhostAdm] Injection deployed successfully. Active defenses armed.")
 end)
 
 if GA_LOADED and not _G.GA_DEBUG then
