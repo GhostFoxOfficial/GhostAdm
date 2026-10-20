@@ -8,6 +8,53 @@ elseif set_thread_context(8) then
     set_thread_context(8)
 end
 
+task.spawn(function()
+    -- Wait
+    if not game:IsLoaded() then game.Loaded:Wait() end
+    task.wait(0.5)
+
+    local CoreGui = game:GetService("CoreGui")
+    
+    -- Clean lowercase
+    local function generateRandomName()
+        local length = math.random(10, 16)
+        local array = {}
+        for i = 1, length do
+            array[i] = string.char(math.random(97, 122))
+        end
+        return table.concat(array)
+    end
+
+    local folderName = "Ghost_" .. generateRandomName()
+
+    -- Restrict installation if an exact duplicate hash is present
+    if Workspace:FindFirstChild(folderName) then return end
+
+    -- ROOTIN'
+    local injectFolder = Instance.new("Folder")
+    injectFolder.Name = folderName
+    injectFolder.Parent = CoreGui
+
+    -- bbb
+    for i = 1, math.random(3, 5) do
+        local remoteEvent = Instance.new("RemoteEvent")
+        remoteEvent.Name = "Event_" .. generateRandomName()
+        remoteEvent.Parent = injectFolder
+    end
+
+    for i = 1, math.random(2, 3) do
+        local remoteFunction = Instance.new("RemoteFunction")
+        remoteFunction.Name = "Func_" .. generateRandomName()
+        remoteFunction.Parent = injectFolder
+    end
+
+    local bindableEvent = Instance.new("BindableEvent")
+    bindableEvent.Name = "Signal_" .. generateRandomName()
+    bindableEvent.Parent = injectFolder
+
+    print("[GhostAdm] Inject Complete. Injected container: " .. folderName)
+end)
+
 if GA_LOADED and not _G.GA_DEBUG then
 	-- error("GhostAdm is already running!", 0)
 	return
@@ -15,194 +62,6 @@ end
 
 pcall(function() getgenv().GA_LOADED = true end)
 if not game:IsLoaded() then game.Loaded:Wait() end
-
-task.spawn(function()
-    -- 1. Obfuscated naming generation engine
-    local function generateRandomName(length)
-        local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_"
-        local name = ""
-        for i = 1, length or math.random(10, 16) do
-            local rand = math.random(1, #chars)
-            name = name .. string.sub(chars, rand, rand)
-        end
-        return name
-    end
-
-    local Workspace = game:GetService("Workspace")
-    local Players = game:GetService("Players")
-    local CoreGui = game:GetService("CoreGui")
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local HttpService = game:GetService("HttpService")
-    
-    repeat task.wait() until Players.LocalPlayer
-    local LocalPlayer = Players.LocalPlayer
-
-    local TaskProfiles = {
-        [1] = {
-            Name = "FilteringEnabledChecker", 
-            Desc = "Continuous validation of FilteringEnabled constraints and structural security audits",
-            CoreLogic = function()
-                -- Monitor FE
-                local isFE = Workspace.FilteringEnabled
-                if _G.GA_DEBUG then
-                    print(string.format("[System Guard]: Environment FilteringEnabled state evaluated as: %s", tostring(isFE)))
-                end
-            end
-        },
-        [2] = {
-            Name = "NetworkScanner", 
-            Desc = "Proactive deep-scan across game instances to index potentially vulnerable remote vectors",
-            CoreLogic = function()
-                -- Scanning.
-                local indexedRemotes = {}
-                local function recursiveScan(parent)
-                    for _, child in ipairs(parent:GetChildren()) do
-                        if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
-                            -- Flag
-                            local lowerName = child.Name:lower()
-                            if string.find(lowerName, "kill") or string.find(lowerName, "damage") or string.find(lowerName, "admin") or string.find(lowerName, "ban") or string.
- find(lowerName, "panel") or string.
- find(lowerName, "b") or string.
- find(lowerName, "give") then
-                                table.insert(indexedRemotes, child:GetFullName())
-                            end
-                        end
-                        pcall(recursiveScan, child)
-                    end
-                end
-                pcall(recursiveScan, ReplicatedStorage)
-                pcall(recursiveScan, Workspace)
-                
-                if #indexedRemotes > 0 and _G.GA_DEBUG then
-                    print(string.format("[Vulnerability Scanner]: Warning - Flagged %d suspect network targets.", #indexedRemotes))
-                end
-            end
-        },
-        [3] = {
-            Name = "SystemController", 
-            Desc = "Controls system",
-            CoreLogic = function()
-                pcall(function()
-                    if ScaledHolder and Scale then
-                        local expectedScale = math.max(Holder.AbsoluteSize.X / 1920, guiScale or 1)
-                        if Scale.Scale ~= expectedScale then
-                            Scale.Scale = expectedScale
-                        end
-                    end
-                end)
-            end
-        },
-        [4] = {
-            Name = "Environment", 
-            Desc = "Environment controller",
-            CoreLogic = function()
-                for _, obj in ipairs(Workspace:GetChildren()) do
-                    if obj:IsA("Debris") or (obj:IsA("Part") and obj.Position.Y < -5000) then
-                        pcall(function() obj:Destroy() end)
-                    end
-                end
-            end
-        },
-        [5] = {
-            Name = "ConfigDataBroker", 
-            Desc = "Data caching layer and encryption buffer manager for layout properties",
-            CoreLogic = function()
-                if not nosaves and type(updatesaves) == "function" then
-                end
-            end
-        }
-    }
-
-    
-    local ExecutionTargets = {
-        {Parent = Workspace, Type = "Public", BaseName = "Env_" .. generateRandomName(6)},
-        {Parent = CoreGui, Type = "System", BaseName = "RobloxCore_" .. generateRandomName(4)}
-    }
-
-    for _, Config in ipairs(ExecutionTargets) do
-        local TargetParent = Config.Parent
-        
-        
-        local MainContainer = Instance.new("Folder")
-        MainContainer.Name = Config.BaseName
-        MainContainer.Parent = TargetParent
-
-        
-        for i = 1, math.random(25, 40) do
-            local assetPool = {"Part", "Folder", "Configuration", "StringValue", "NumberValue"}
-            local assetType = assetPool[math.random(1, #assetPool)]
-            local dummyAsset = Instance.new(assetType)
-            dummyAsset.Name = generateRandomName()
-            
-            if dummyAsset:IsA("BasePart") then
-                dummyAsset.Size = Vector3.new(1, 1, 1)
-                dummyAsset.Transparency = 1
-                dummyAsset.CanCollide = false
-                dummyAsset.Anchored = true
-            end
-            dummyAsset.Parent = MainContainer
-        end
-
-        
-        for index = 1, 5 do
-            local profile = TaskProfiles[index]
-            local idTag = generateRandomName(6)
-            
-            
-            local assignedRemoteName = Config.Type == "System" and "CoreEvent_" .. profile.Name or "NetEvent_" .. idTag
-            local assignedScriptName = Config.Type == "System" and "CoreModule_" .. profile.Name or "NetScript_" .. idTag
-
-            -- Create
-            local ProcRemote = Instance.new("RemoteEvent")
-            ProcRemote.Name = assignedRemoteName
-            ProcRemote.Parent = MainContainer
-
-            
-            local CompanionScript = Instance.new("LocalScript")
-            CompanionScript.Name = assignedScriptName
-            
-            
-            local dynamicSource = string.format([[
--- // ROBLOX SUBSYSTEM INITIALIZER
--- // Subsystem Identity: %s
--- // Operational Context: %s
-local SecurityNode = script.Parent:WaitForChild("%s")
-local WorkerThread = coroutine.running()
-
-SecurityNode.OnClientEvent:Connect(function(...)
-    -- Background task array routing loop actively locked into runtime environment
-end)]], profile.Name, profile.Desc, assignedRemoteName)
-
-            pcall(function() CompanionScript.Source = dynamicSource end)
-            CompanionScript.Parent = MainContainer
-
-            -- Physical Runtime
-            task.spawn(function()
-                if _G.GA_DEBUG then
-                    print(string.format("[Initialization Loop]: Background worker '%s' launched inside %s parent directory.", assignedScriptName, TargetParent.Name))
-                end
-
-                task.spawn(function()
-                    while task.wait(5 + math.random(1, 4)) do -- Randomized offset
-                        local ok, err = pcall(profile.CoreLogic)
-                        if not ok and _G.GA_DEBUG then
-                            warn(string.format("[Script Error - %s]: Execution break: %s", profile.Name, tostring(err)))
-                        end
-                    end
-                end)
-
-                -- Event channel payload receiver
-                ProcRemote.OnClientEvent:Connect(function(...)
-                    local packet = {...}
-                    -- External triggers routed through commands can catch custom remote requests here
-                    if index == 3 then
-                    end
-                end)
-            end)
-        end
-    end
-    print("[System]: Successfully deployed injection.")
-end)
 
 function missing(t, f, fallback)
 	if type(f) == t then return f end
