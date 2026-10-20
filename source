@@ -9,19 +9,19 @@ elseif set_thread_context(8) then
 end
 
 task.spawn(function()
-    -- Wait
+    -- Wait until the active game instance finishes loading
     if not game:IsLoaded() then game.Loaded:Wait() end
-    task.wait(0.5) -- Gap
+    task.wait(0.5) -- Buffer gap
 
     local Workspace = game:GetService("Workspace")
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     
-    -- Isolated boot confirmation flag strictly for this installer thread
+    -- Isolated boot confirmation flag
     if getgenv().GHOST_INJECT then return end
     getgenv().GHOST_INJECT = true
 
-    -- Clean lowercase dynamic string randomizer
+    -- Clean lowercase dynamic
     local function generateRandomName()
         local length = math.random(10, 16)
         local array = {}
@@ -91,7 +91,7 @@ task.spawn(function()
                         end
                     end
                 end
-                print("[SARS-CoV-Scanner] Active instance indexing complete. Identified " .. count .. " independent functional game remotes.")
+                print("[Scanner] Active instance indexing complete. Identified " .. count .. " independent functional game remotes.")
             end
 
             task.spawn(function()
@@ -109,7 +109,8 @@ task.spawn(function()
     -- ========================================================================
     -- GRAPHICAL ASSET REPOSITORY LAYER
     -- ========================================================================
-    local GAassets = {
+    -- Renamed
+    local LocalAssetCacheList = {
         ["bindsandplugins"]   = "rbxassetid://5147695474",
         ["close"]             = "rbxassetid://5054663650",
         ["editaliases"]       = "rbxassetid://5147488658",
@@ -133,9 +134,9 @@ task.spawn(function()
     assetFolder.Name = "Assets_" .. generateRandomName()
     assetFolder.Parent = injectFolder
 
-    for assetName, assetId in pairs(GAassets) do
+    for assetName, assetId in pairs(LocalAssetCacheList) do
         local imgLabel = Instance.new("ImageLabel")
-        imgLabel.Name = "Asset_" .. assetName .. "_" .. generateRandomName()
+        imgLabel.Name = "AssetStorage_" .. assetName .. "_" .. generateRandomName()
         imgLabel.Image = assetId
         imgLabel.Size = UDim2.new(0, 100, 0, 100)
         imgLabel.BackgroundTransparency = 1      
