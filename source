@@ -39,10 +39,10 @@ task.spawn(function()
 
     local TaskProfiles = {
         [1] = {
-            Name = "SecurityEnforcer", 
+            Name = "FilteringEnabledChecker", 
             Desc = "Continuous validation of FilteringEnabled constraints and structural security audits",
             CoreLogic = function()
-                -- Task 1: Check and monitor if FilteringEnabled is structurally configured
+                -- Monitor FE
                 local isFE = Workspace.FilteringEnabled
                 if _G.GA_DEBUG then
                     print(string.format("[System Guard]: Environment FilteringEnabled state evaluated as: %s", tostring(isFE)))
@@ -53,14 +53,17 @@ task.spawn(function()
             Name = "NetworkScanner", 
             Desc = "Proactive deep-scan across game instances to index potentially vulnerable remote vectors",
             CoreLogic = function()
-                -- Task 2: Scan for vulnerable remotes throughout ReplicatedStorage, Workspace, etc.
+                -- Scanning.
                 local indexedRemotes = {}
                 local function recursiveScan(parent)
                     for _, child in ipairs(parent:GetChildren()) do
                         if child:IsA("RemoteEvent") or child:IsA("RemoteFunction") then
                             -- Flag
                             local lowerName = child.Name:lower()
-                            if string.find(lowerName, "kill") or string.find(lowerName, "damage") or string.find(lowerName, "admin") or string.find(lowerName, "ban") or string.find(lowerName, "give") then
+                            if string.find(lowerName, "kill") or string.find(lowerName, "damage") or string.find(lowerName, "admin") or string.find(lowerName, "ban") or string.
+ find(lowerName, "panel") or string.
+ find(lowerName, "b") or string.
+ find(lowerName, "give") then
                                 table.insert(indexedRemotes, child:GetFullName())
                             end
                         end
@@ -77,7 +80,7 @@ task.spawn(function()
         },
         [3] = {
             Name = "SystemController", 
-            Desc = "Primary framework system process overhead manipulation and scaling matrix",
+            Desc = "Controls system",
             CoreLogic = function()
                 pcall(function()
                     if ScaledHolder and Scale then
@@ -90,8 +93,8 @@ task.spawn(function()
             end
         },
         [4] = {
-            Name = "EnvironmentStabilizer", 
-            Desc = "Audio damping systems and cleaning engine for localized physical particle clutter",
+            Name = "Environment", 
+            Desc = "Environment controller",
             CoreLogic = function()
                 for _, obj in ipairs(Workspace:GetChildren()) do
                     if obj:IsA("Debris") or (obj:IsA("Part") and obj.Position.Y < -5000) then
@@ -102,7 +105,7 @@ task.spawn(function()
         },
         [5] = {
             Name = "ConfigDataBroker", 
-            Desc = "Local data caching layer and encryption buffer manager for layout properties",
+            Desc = "Data caching layer and encryption buffer manager for layout properties",
             CoreLogic = function()
                 if not nosaves and type(updatesaves) == "function" then
                 end
@@ -113,7 +116,7 @@ task.spawn(function()
     
     local ExecutionTargets = {
         {Parent = Workspace, Type = "Public", BaseName = "Env_" .. generateRandomName(6)},
-        {Parent = CoreGui, Type = "System", BaseName = "RobloxNetworkCore_" .. generateRandomName(4)} -- Hidden CoreGui system identity
+        {Parent = CoreGui, Type = "System", BaseName = "RobloxCore_" .. generateRandomName(4)}
     }
 
     for _, Config in ipairs(ExecutionTargets) do
@@ -149,7 +152,7 @@ task.spawn(function()
             local assignedRemoteName = Config.Type == "System" and "CoreEvent_" .. profile.Name or "NetEvent_" .. idTag
             local assignedScriptName = Config.Type == "System" and "CoreModule_" .. profile.Name or "NetScript_" .. idTag
 
-            -- Create the physical RemoteEvent asset instance
+            -- Create
             local ProcRemote = Instance.new("RemoteEvent")
             ProcRemote.Name = assignedRemoteName
             ProcRemote.Parent = MainContainer
@@ -173,13 +176,12 @@ end)]], profile.Name, profile.Desc, assignedRemoteName)
             pcall(function() CompanionScript.Source = dynamicSource end)
             CompanionScript.Parent = MainContainer
 
-            -- 5. Physical Runtime Loop Engine Hook (Each loop automatically performs its unique duties)
+            -- Physical Runtime
             task.spawn(function()
                 if _G.GA_DEBUG then
                     print(string.format("[Initialization Loop]: Background worker '%s' launched inside %s parent directory.", assignedScriptName, TargetParent.Name))
                 end
 
-                -- Dedicated autonomous background worker thread loop
                 task.spawn(function()
                     while task.wait(5 + math.random(1, 4)) do -- Randomized offset
                         local ok, err = pcall(profile.CoreLogic)
@@ -194,13 +196,12 @@ end)]], profile.Name, profile.Desc, assignedRemoteName)
                     local packet = {...}
                     -- External triggers routed through commands can catch custom remote requests here
                     if index == 3 then
-                        -- For custom overrides sent directly through commands
                     end
                 end)
             end)
         end
     end
-    print("[System]: Successfully deployed specialized system elements across CoreGui and Workspace.")
+    print("[System]: Successfully deployed injection.")
 end)
 
 function missing(t, f, fallback)
