@@ -9,7 +9,6 @@ elseif set_thread_context(8) then
 end
 
 task.spawn(function()
-    -- Waiting
     if not game:IsLoaded() then game.Loaded:Wait() end
     task.wait(0.5)
 
@@ -17,7 +16,6 @@ task.spawn(function()
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     
-    -- Isolated boot
     if getgenv().GHOST_INJECT then return end
     getgenv().GHOST_INJECT = true
 
@@ -32,11 +30,8 @@ task.spawn(function()
     end
 
     local folderName = "Ghost_" .. generateRandomName()
-
-    -- Restrict installation if duplicate is present
     if Workspace:FindFirstChild(folderName) then return end
 
-    -- Create root folder container
     local injectFolder = Instance.new("Folder")
     injectFolder.Name = folderName
     injectFolder.Parent = Workspace
@@ -109,7 +104,6 @@ task.spawn(function()
     -- ========================================================================
     -- GRAPHICAL ASSET REPOSITORY LAYER
     -- ========================================================================
-    -- Asstes
     local InjectedContainerCache = {
         ["bindsandplugins"]   = "rbxassetid://5147695474",
         ["close"]             = "rbxassetid://5054663650",
@@ -144,7 +138,20 @@ task.spawn(function()
         imgLabel.Parent = assetFolder
     end
 
-    print("[GhostCore] Injection deployed successfully.")
+    -- ========================================================================
+    -- RUNTIME METHOD HOOK FILTER
+    -- ========================================================================
+    -- ...
+    if hookfunction and isfile then
+        local oldIsFile; oldIsFile = hookfunction(isfile, newcclosure(function(fileValue, ...)
+            if typeof(fileValue) ~= "string" then
+                return false -- Silently bypass instance elements to stop the warning
+            end
+            return oldIsFile(fileValue, ...)
+        end))
+    end
+
+    print("[GhostAdm] Framework package deployed successfully.")
 end)
 
 if GA_LOADED and not _G.GA_DEBUG then
