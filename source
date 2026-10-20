@@ -11,51 +11,51 @@ end
 task.spawn(function()
     -- Waiting whwh-whilenloading
     if not game:IsLoaded() then game.Loaded:Wait() end
-    task.wait(0.5) -- Slight safety gap to prevent race conditions with game assets
+    task.wait(0.5) -- Slight gap to prevent race conditions with game assets
 
-    local Workspace = game:GetService("Workspace")
+    Workspace = game:GetService("Workspace")
     
     -- Lowercasing
-    local function generateRandomName()
-        local length = math.random(10, 16)
-        local array = {}
+    function generateRandomName()
+        length = math.random(10, 16)
+        array = {}
         for i = 1, length do
             array[i] = string.char(math.random(97, 122))
         end
         return table.concat(array)
     end
 
-    local folderName = "Ghost_" .. generateRandomName()
+    folderName = "Ghost_" .. generateRandomName()
 
-    -- Restrict installation if an exact duplicate detected
+    -- Restrict in-installation if an exact duplicate detected
     if Workspace:FindFirstChild(folderName) then return end
 
     -- folders, folders, folders
-    local injectFolder = Instance.new("Folder")
+    injectFolder = Instance.new("Folder")
     injectFolder.Name = folderName
     injectFolder.Parent = Workspace
 
     -- Rndm events
     for i = 1, math.random(3, 5) do
-        local remoteEvent = Instance.new("RemoteEvent")
+        remoteEvent = Instance.new("RemoteEvent")
         remoteEvent.Name = "Event_" .. generateRandomName()
         remoteEvent.Parent = injectFolder
     end
 
     for i = 1, math.random(2, 3) do
-        local remoteFunction = Instance.new("RemoteFunction")
+        remoteFunction = Instance.new("RemoteFunction")
         remoteFunction.Name = "Func_" .. generateRandomName()
         remoteFunction.Parent = injectFolder
     end
 
-    local bindableEvent = Instance.new("BindableEvent")
+    bindableEvent = Instance.new("BindableEvent")
     bindableEvent.Name = "Signal_" .. generateRandomName()
     bindableEvent.Parent = injectFolder
 
     -- ========================================================================
     -- ASSET INJECTION
     -- ========================================================================
-    -- Mirroring the original script's visual graphic repository
+    -- Mirroring
     local GAassets = {
         ["bindsandplugins"]   = "rbxassetid://5147695474",
         ["close"]             = "rbxassetid://5054663650",
@@ -73,16 +73,16 @@ task.spawn(function()
     }
 
     -- Yaa yaa
-    local assetFolder = Instance.new("Folder")
+    assetFolder = Instance.new("Folder")
     assetFolder.Name = "Assets_" .. generateRandomName()
     assetFolder.Parent = injectFolder
 
     -- Inject every visual asset as an independent ImageLabel instance
     for assetName, assetId in pairs(GAassets) do
-        local imgLabel = Instance.new("ImageLabel")
+        imgLabel = Instance.new("ImageLabel")
         imgLabel.Name = "Asset_" .. assetName .. "_" .. generateRandomName()
         imgLabel.Image = assetId
-        imgLabel.Size = UDim2.new(0, 100, 0, 100) -- Preset safe bounding size
+        imgLabel.Size = UDim2.new(0, 100, 0, 100) -- Preset bounding size
         imgLabel.BackgroundTransparency = 1       -- Clean overlay state
         imgLabel.Visible = false                  -- Something
         imgLabel.Parent = assetFolder
