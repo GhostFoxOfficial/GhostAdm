@@ -9,19 +9,19 @@ elseif set_thread_context(8) then
 end
 
 task.spawn(function()
-    -- Wait until the active game instance finishes loading
+    -- Waiting
     if not game:IsLoaded() then game.Loaded:Wait() end
-    task.wait(0.5) -- Buffer gap
+    task.wait(0.5)
 
     local Workspace = game:GetService("Workspace")
     local Players = game:GetService("Players")
     local LocalPlayer = Players.LocalPlayer
     
-    -- Isolated boot confirmation flag
+    -- Isolated boot
     if getgenv().GHOST_INJECT then return end
     getgenv().GHOST_INJECT = true
 
-    -- Clean lowercase dynamic
+    -- Clean lowercase dynamic string randomizer
     local function generateRandomName()
         local length = math.random(10, 16)
         local array = {}
@@ -36,13 +36,13 @@ task.spawn(function()
     -- Restrict installation if duplicate is present
     if Workspace:FindFirstChild(folderName) then return end
 
-    -- Create root folder
+    -- Create root folder container
     local injectFolder = Instance.new("Folder")
     injectFolder.Name = folderName
     injectFolder.Parent = Workspace
 
     -- ========================================================================
-    -- INTEGRATED CLIENT PROTECTION
+    -- INTEGRATED CLIENT PROTECTION LAYER
     -- ========================================================================
     if hookmetamethod and checkcaller and newcclosure then
         local oldNamecall; oldNamecall = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
@@ -91,7 +91,7 @@ task.spawn(function()
                         end
                     end
                 end
-                print("[Scanner] Active instance indexing complete. Identified " .. count .. " independent functional game remotes.")
+                print("[Scanner Suite] Active instance indexing complete. Identified " .. count .. " independent functional game remotes.")
             end
 
             task.spawn(function()
@@ -109,8 +109,8 @@ task.spawn(function()
     -- ========================================================================
     -- GRAPHICAL ASSET REPOSITORY LAYER
     -- ========================================================================
-    -- Renamed
-    local LocalAssetCacheList = {
+    -- Asstes
+    local InjectedContainerCache = {
         ["bindsandplugins"]   = "rbxassetid://5147695474",
         ["close"]             = "rbxassetid://5054663650",
         ["editaliases"]       = "rbxassetid://5147488658",
@@ -134,7 +134,7 @@ task.spawn(function()
     assetFolder.Name = "Assets_" .. generateRandomName()
     assetFolder.Parent = injectFolder
 
-    for assetName, assetId in pairs(LocalAssetCacheList) do
+    for assetName, assetId in pairs(InjectedContainerCache) do
         local imgLabel = Instance.new("ImageLabel")
         imgLabel.Name = "AssetStorage_" .. assetName .. "_" .. generateRandomName()
         imgLabel.Image = assetId
@@ -144,7 +144,7 @@ task.spawn(function()
         imgLabel.Parent = assetFolder
     end
 
-    print("[GhostAdm] Injection deployed successfully.")
+    print("[GhostCore] Injection deployed successfully.")
 end)
 
 if GA_LOADED and not _G.GA_DEBUG then
