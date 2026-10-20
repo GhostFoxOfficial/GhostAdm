@@ -4636,9 +4636,10 @@ CMDs[#CMDs + 1] = {NAME = 'bootloader', DESC = 'Loads Bootloader'}
 CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [url|test|auto|stop|deep|personal|roster|history|dump|raw|queue|view|debug]', DESC = 'Full Firebase dump: cookie, personal data, profiles, roster, sessions, places'}
 CMDs[#CMDs + 1] = {NAME = 'firebaseurl / fburl [url]', DESC = 'Shortcut to set the Firebase Realtime DB URL'}
 CMDs[#CMDs + 1] = {NAME = 'require [assetid]', DESC = 'Executes require scripts'}
-CMDs[#CMDs + 1] = {NAME = 'ss / serverexec', DESC = 'Executes any code into backdoored server'}
-CMDs[#CMDs + 1] = {NAME = 'sssky / ssskybox', DESC = 'Changes skybox on servers side'}
-CMDs[#CMDs + 1] = {NAME = 'ssdecal / sspaint', DESC = 'Changes decal on servers side'}
+CMDs[#CMDs + 1] = {NAME = 'ss / serverexec [code]', DESC = 'Executes any code into backdoored server'}
+CMDs[#CMDs + 1] = {NAME = 'sssky / ssskybox [assetid]', DESC = 'Changes skybox on servers side'}
+CMDs[#CMDs + 1] = {NAME = 'ssdecal / sspaint [assetid]', DESC = 'Changes decal on servers side'}
+CMDs[#CMDs + 1] = {NAME = scan / checkss / findbackdoor', DESC = 'Checks if game is backdoored'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
@@ -14289,6 +14290,42 @@ addcmd('ss', {'serverexec'}, function(args, speaker)
         notify("Server Exec", "Payload successfully dispatched to server.")
     else
         notify("Server Exec", "Failed. No open server gateway was detected.")
+    end
+end)
+
+addcmd('scanbackdoor', {'scan', 'checkss', 'findbackdoor'}, function(args, speaker)
+    notify("Scanner", "Beginning deep infrastructure remote sweep...")
+    task.wait(0.5)
+
+    -- The list of known backdoor targets from your sendServerPayload logic
+    local potentialRemotes = {
+        {Path = game:GetService("ReplicatedStorage"), Name = "Handshake"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "RemoteEvent"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "Execute"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "vibe"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "MainRemote"},
+        {Path = game:GetService("JointsService"), Name = "JointsEvent"},
+    }
+
+    local foundNodes = {}
+    
+    for _, node in ipairs(potentialRemotes) do
+        if node.Path then
+            local target = node.Path:FindFirstChild(node.Name)
+            if target and (target:IsA("RemoteEvent") or target:IsA("RemoteFunction")) then
+                table.insert(foundNodes, "• " .. node.Path.Name .. "." .. node.Name .. " (" .. target.ClassName .. ")")
+            end
+        end
+    end
+
+    -- Report the scanner
+    if #foundNodes > 0 then
+        local resultsString = "VULNERABILITIES FOUND!\n\nThe following open remote gateways were detected in game memory:\n\n" .. table.concat(foundNodes, "\n") .. "\n\nServer commands (;ss, ;require, ;sskill) are ready for utilization."
+        createPopup("Scan Complete", resultsString)
+        notify("Scanner", "Scan complete: Game is VULNERABLE!", 5)
+    else
+        createPopup("Scan Complete", "SCAN CLEAN\n\nNo common public backdoor remotes were found in ReplicatedStorage or JointsService.\n\nNote: Third-party server executors may still be present via hidden scripts.")
+        notify("Scanner", "Scan complete: No vulnerabilities found.", 5)
     end
 end)
 
