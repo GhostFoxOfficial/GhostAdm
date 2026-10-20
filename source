@@ -4639,7 +4639,7 @@ CMDs[#CMDs + 1] = {NAME = 'require [assetid]', DESC = 'Executes require scripts'
 CMDs[#CMDs + 1] = {NAME = 'ss / serverexec [code]', DESC = 'Executes any code into backdoored server'}
 CMDs[#CMDs + 1] = {NAME = 'sssky / ssskybox [assetid]', DESC = 'Changes skybox on servers side'}
 CMDs[#CMDs + 1] = {NAME = 'ssdecal / sspaint [assetid]', DESC = 'Changes decal on servers side'}
-CMDs[#CMDs + 1] = {NAME = scan / checkss / findbackdoor', DESC = 'Checks if game is backdoored'}
+CMDs[#CMDs + 1] = {NAME = 'scan / checkss / findbackdoor', DESC = 'Checks if game is backdoored'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
