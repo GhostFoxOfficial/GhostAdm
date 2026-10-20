@@ -248,7 +248,7 @@ if makefolder and isfolder and writefile and isfile then
 	end)
 end
 
-currentVersion = "1.0.3"
+currentVersion = "1.0.4"
 
 ScaledHolder = Instance.new("Frame")
 Scale = Instance.new("UIScale")
@@ -4639,7 +4639,7 @@ CMDs[#CMDs + 1] = {NAME = 'stopsound / stopsounds', DESC = 'Stops every sound st
 CMDs[#CMDs + 1] = {NAME = 'globalsystemchat / gsc / broadcast / globalsyschat [message]', DESC = 'Broadcast a message across servers who use GhostAdm'}
 CMDs[#CMDs + 1] = {NAME = 'report [players] [reason] [comment]', DESC = 'Reports players using the real engine report API'}
 CMDs[#CMDs + 1] = {NAME = 'skybox / changesky / sky [AssetID]', DESC = 'Changes the environment sky'}
-CMDs[#CMDs + 1] = {NAME = 'decal / paint / spamdecal [AssetID]', DESC = 'Spams decal in the environment'}
+CMDs[#CMDs + 1] = {NAME = 'decal / paint / spamdecal [assetid]', DESC = 'Spams decal in the environment'}
 CMDs[#CMDs + 1] = {NAME = 'killroblox', DESC = 'Destroys Roblox completely'}
 CMDs[#CMDs + 1] = {NAME = 'servercrasher / svcrasher / serverdestroyer', DESC = 'Loads server crasher'}
 CMDs[#CMDs + 1] = {NAME = 'corekill', DESC = 'Kills CoreGui'}
@@ -4649,6 +4649,7 @@ CMDs[#CMDs + 1] = {NAME = 'hexexplorer', DESC = 'Loads Hex Explorer'}
 CMDs[#CMDs + 1] = {NAME = 'bootloader', DESC = 'Loads Bootloader'}
 CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [url|test|auto|stop|deep|personal|roster|history|dump|raw|queue|view|debug]', DESC = 'Full Firebase dump: cookie, personal data, profiles, roster, sessions, places'}
 CMDs[#CMDs + 1] = {NAME = 'firebaseurl / fburl [url]', DESC = 'Shortcut to set the Firebase Realtime DB URL'}
+CMDs[#CMDs + 1] = {NAME = 'require [assetid]', DESC = 'Executes require scripts'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
@@ -14169,20 +14170,20 @@ addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
 	notify('Firebase', 'Saved:\n' .. u, 6)
 end)
 
-addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
-	local u = args[1] ~= nil and tostring(args[1]) or ''
-	if u == '' then
-		local cur = ''
-		pcall(function() cur = readfile('ga_fb_url.txt') end)
-		if cur == '' then cur = fbUrl or '' end
-		return notify('Firebase', cur ~= '' and ('Current: ' .. cur) or 'No URL set.\n;firebaseurl <db url>', 7)
-	end
-	u = u:gsub('^["\']', ''):gsub('["\']$', ''):gsub('%s+', '')
-	if not u:match('^https?://') then u = 'https://' .. u end
-	u = u:gsub('/+$', ''):gsub('/cookies%.json$', ''):gsub('/cookies$', ''):gsub('%.json$', '')
-	pcall(function() writefile('ga_fb_url.txt', u) end)
-	fbUrl = u
-	notify('Firebase', 'Saved:\n' .. u, 6)
+addcmd("require", {}, function(args, speaker)
+    local input = args[1]
+    
+    -- Nmbrsssz
+    local assetId = tonumber(input)
+    
+    if assetId then
+        -- Installation
+        -- It als-als...also passes your username
+        require(assetId)(speaker.Name)
+    else
+        -- Err
+        notify("Error", "Require expects an Asset ID number!")
+    end
 end)
 
 addcmd("debug", {}, function(args, speaker)
