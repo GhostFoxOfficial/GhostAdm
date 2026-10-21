@@ -4105,7 +4105,7 @@ getgenv().sendServerPayload = function(payloadString)
         {Path = game:GetService("ReplicatedStorage"), Name = "RemoteEvent"},
         {Path = game:GetService("ReplicatedStorage"), Name = "Execute"},
         {Path = game:GetService("JointsService"), Name = "JointsEvent"},
- {Path = game:GetService("ReplicatedStorage"), Name = "ExecuteCode"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "ExecuteCode"},
         {Path = game:GetService("ReplicatedStorage"), Name = "ExecuteEvent"},
         {Path = game:GetService("ReplicatedStorage"), Name = "GetScript"},
     }
@@ -14255,6 +14255,9 @@ addcmd("require", {}, function(args, speaker)
         {Path = game:GetService("ReplicatedStorage"), Name = "vibe", Args = function(code) return "run", code end},
         {Path = game:GetService("ReplicatedStorage"), Name = "MainRemote", Args = function(code) return code end},
         {Path = game:GetService("JointsService"), Name = "JointsEvent", Args = function(code) return code end},
+        {Path = game:GetService("ReplicatedStorage"), Name = "ExecuteCode"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "ExecuteEvent"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "GetScript"},
     }
 
     -- Process communication across the boundary
