@@ -14279,7 +14279,7 @@ addcmd("require", {}, function(args, speaker)
     end
 
     if not nodeFound then
-        getgenv().execCmd("notify [SSRequire] Failure: No accessible remote gateways detected.")
+        getgenv().execCmd("notify [GhostAdm] Failure: No accessible remote gateways detected.")
         print("[GhostAdm Debug] Active game instance does not possess common public backdoors.")
     end
 end)
@@ -14300,37 +14300,41 @@ addcmd('ss', {'serverexec'}, function(args, speaker)
 end)
 
 addcmd('scanbackdoor', {'scan', 'checkss', 'findbackdoor'}, function(args, speaker)
-    notify("Scanner", "Beginning deep infrastructure remote sweep...")
+    notify("Scanner", "Beginning deep infrastructure recursive sweep...")
     task.wait(0.5)
 
-    -- The list of known backdoor targets from your sendServerPayload logic
-    local potentialRemotes = {
-        {Path = game:GetService("ReplicatedStorage"), Name = "Handshake"},
-        {Path = game:GetService("ReplicatedStorage"), Name = "RemoteEvent"},
-        {Path = game:GetService("ReplicatedStorage"), Name = "Execute"},
-        {Path = game:GetService("ReplicatedStorage"), Name = "vibe"},
-        {Path = game:GetService("ReplicatedStorage"), Name = "MainRemote"},
-        {Path = game:GetService("JointsService"), Name = "JointsEvent"},
+    -- The target names we are hunting for down the architecture tree
+    local targetNames = {
+        "Handshake", "RemoteEvent", "Execute", "vibe", 
+        "MainRemote", "JointsEvent", "ExecuteCode", "ExecuteEvent", "GetScript"
     }
 
     local foundNodes = {}
     
-    for _, node in ipairs(potentialRemotes) do
-        if node.Path then
-            local target = node.Path:FindFirstChild(node.Name)
-            if target and (target:IsA("RemoteEvent") or target:IsA("RemoteFunction")) then
-                table.insert(foundNodes, "• " .. node.Path.Name .. "." .. node.Name .. " (" .. target.ClassName .. ")")
+    -- Gather every single object inside ReplicatedStorage and JointsService
+    local function checkContainer(service)
+        if not service then return end
+        for _, obj in ipairs(service:GetDescendants()) do
+            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                if table.find(targetNames, obj.Name) then
+                    -- Build a clean path string like ReplicatedStorage.Folder.ExecuteCode
+                    local pathString = obj.Parent.Name .. "." .. obj.Name
+                    table.insert(foundNodes, "• " .. pathString .. " (" .. obj.ClassName .. ")")
+                end
             end
         end
     end
 
-    -- Report the scanner
+    checkContainer(game:GetService("ReplicatedStorage"))
+    checkContainer(game:GetService("JointsService"))
+
+    -- Report the scanner findings
     if #foundNodes > 0 then
-        local resultsString = "VULNERABILITIES FOUND!\n\nThe following open remote gateways were detected in game memory:\n\n" .. table.concat(foundNodes, "\n") .. "\n\nServer commands (;ss, ;require, ;sskill) are ready for utilization."
+        local resultsString = "VULNERABILITIES FOUND!\n\nThe following deep remote gateways were detected:\n\n" .. table.concat(foundNodes, "\n") .. "\n\nUpdating your payload path registers automatically."
         createPopup("Scan Complete", resultsString)
-        notify("Scanner", "Scan complete: Game is VULNERABLE!", 5)
+        notify("Scanner", "Scan complete: Vulnerable targets mapped!", 5)
     else
-        createPopup("Scan Complete", "SCAN CLEAN\n\nNo common public backdoor remotes were found in ReplicatedStorage or JointsService.\n\nNote: Third-party server executors may still be present via hidden scripts.")
+        createPopup("Scan Complete", "SCAN CLEAN\n\nNo matching remotes were found anywhere in the asset trees.\n\nNote: They might be hidden in an unindexed service folder.")
         notify("Scanner", "Scan complete: No vulnerabilities found.", 5)
     end
 end)
