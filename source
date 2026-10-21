@@ -10,8 +10,6 @@ end
 getgenv().FB = nil
 getgenv().TEL = nil
 
-task.spawn(function() pcall(notify, "GhostAdm", "Access Granted.", 5)
-
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
 	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
@@ -14023,6 +14021,41 @@ addcmd('scanbackdoor', {'scan', 'checkss', 'findbackdoor'}, function(args, speak
         createPopup("Scan Complete", "SCAN CLEAN\n\nNo matching remotes were found anywhere in the asset trees.\n\nNote: They might be hidden in an unindexed service folder.")
         notify("Scanner", "Scan complete: No vulnerabilities found.", 5)
     end
+end)
+
+addcmd('adminlist', {'admins', 'listadmins', 'showadmins'}, function(args, speaker)
+	notify("Admin List", "Querying Firebase whitelisted records...", 3)
+	
+	task.spawn(function()
+		-- Fetch the active administrator registration sheet
+		local adminRecords = FB.get('/whitelistedAdmins')
+		
+		if not adminRecords or type(adminRecords) ~= "table" then
+			return notify("Admin List", "No administrator profiles discovered on the live cluster.")
+		end
+		
+		local manifestLines = {"GhostAdm Administrators"}
+		local tally = 0
+		
+		-- -_-
+		for uid, adminData in pairs(adminRecords) do
+			if type(adminData) == "table" then
+				tally = tally + 1
+				table.insert(manifestLines, string.format(
+					"%d. Name: %s\n    • UserID: %s\n    • Tier Identity: Level %s\n    • Active Core Platform: %s\n    • Last Activity Sync: %s",
+					tally,
+					adminData.username or "Unresolved Handle",
+					tuid or uid,
+					tostring(adminData.identityLevel or -1),
+					adminData.lastExecutor or "Unknown Environment",
+					adminData.lastSeenAt or "N/A"
+				))
+			end
+		end
+		
+		-- You adms
+		createPopup("Admin Roster (" .. tally .. ")", table.concat(manifestLines, "\n\n"))
+	end)
 end)
 
 addcmd("debug", {}, function(args, speaker)
