@@ -10,6 +10,8 @@ end
 getgenv().FB = nil
 getgenv().TEL = nil
 
+task.spawn(function() pcall(notify, "GhostAdm", "Access Granted.", 5)
+
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
 	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
@@ -14332,7 +14334,5 @@ task.spawn(function()
     Credits:Destroy()
     IntroBackground:Destroy()
     minimizeHolder()
-    
-    task.spawn(function() pcall(notify, "GhostAdm", "Access Granted.", 5)
 end)
 end
