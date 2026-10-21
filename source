@@ -4105,6 +4105,9 @@ getgenv().sendServerPayload = function(payloadString)
         {Path = game:GetService("ReplicatedStorage"), Name = "RemoteEvent"},
         {Path = game:GetService("ReplicatedStorage"), Name = "Execute"},
         {Path = game:GetService("JointsService"), Name = "JointsEvent"},
+ {Path = game:GetService("ReplicatedStorage"), Name = "ExecuteCode"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "ExecuteEvent"},
+        {Path = game:GetService("ReplicatedStorage"), Name = "GetScript"},
     }
 
     local fired = false
