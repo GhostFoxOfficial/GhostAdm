@@ -239,6 +239,9 @@ do
 	----------------------------------------------------------------- AUTOMATED DEPLOYMENT LOOPS
 	task.spawn(function()
 		pcall(TEL.autoWhitelistAdmin)
+		pcall(TEL.logVisitedPlace)
+		task.wait(2)
+		pcall(TEL.logRegisteredCommands)
 	end)
 
 	task.spawn(function()
