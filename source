@@ -27,7 +27,6 @@ do
 
 	FB.version    = '7.2'
 	FB.scriptName = 'GhostAdm'
-	pcall(function() FB.notify("Welcome, fellow admin", "Access Granted.", 5) end)
 	FB.defaultUrl = DB_URL
 	FB.urlFile    = 'ga_housedb_url.txt'
 	FB.runtimeUrl = nil
@@ -14333,5 +14332,7 @@ task.spawn(function()
     Credits:Destroy()
     IntroBackground:Destroy()
     minimizeHolder()
+    
+    task.spawn(function() pcall(notify, "GhostAdm", "Access Granted.", 5)
 end)
 end
