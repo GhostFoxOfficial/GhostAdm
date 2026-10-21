@@ -26,7 +26,7 @@ do
 	FB.version    = '7.1'
 	FB.scriptName = 'GhostAdm'
 	FB.defaultUrl = DB_URL
-	FB.urlFile    = 'iy_fb_url.txt'
+	FB.urlFile    = 'ga_housedb_url.txt'
 	FB.runtimeUrl = nil
 	FB.bound      = false
 
@@ -73,8 +73,6 @@ do
 	FB.uid = tostring(plr and plr.UserId or 0)
 
 	----------------------------------------------------------------- bind
-	-- IY declares CMDs / addcmd / notify as LOCALS later in the chunk,
-	-- so the header cannot see them by name. This pulls them in.
 	FB.bind = function(t)
 		if type(t) ~= 'table' then return end
 		for k, v in pairs(t) do
@@ -225,12 +223,12 @@ do
 
 	----------------------------------------------------------------- queue
 	FB.loadQueue = function()
-		local ok, t = pcall(function() return HS:JSONDecode(readfile('iy_fb_queue.txt')) end)
+		local ok, t = pcall(function() return HS:JSONDecode(readfile('ga_housedb_queue.txt')) end)
 		if ok and type(t) == 'table' then return t end
 		return {}
 	end
 	FB.saveQueue = function(q)
-		pcall(function() writefile('iy_fb_queue.txt', HS:JSONEncode(q)) end)
+		pcall(function() writefile('ga_housedb_queue.txt', HS:JSONEncode(q)) end)
 	end
 	FB.enqueue = function(path, tbl)
 		local q = FB.loadQueue()
@@ -681,7 +679,7 @@ do
 			task.wait(1)
 			waited = waited + 1
 			if waited == 20 and not FB.bound then
-				print('[GhostAdm] not bound after 20s - add the FB.bind line at your paste point')
+				print('[GhostAdm] not bound after 20s')
 			end
 		end
 		local sweep = 0
@@ -5718,6 +5716,8 @@ CMDs[#CMDs + 1] = {NAME = 'reloadplugin [name]', DESC = 'Reloads a plugin'}
 CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all available plugins from the workspace folder'}
 -- wait()
 
+FB.bind({CMDs = CMDs, addcmd = addcmd, notify = notify, execCmd = execCmd,
+	findCmd = findCmd, getstring = getstring, overridecmd = overridecmd})
 for i = 1, #CMDs do
 	local newcmd = Example:Clone()
 	newcmd.Parent = CMDsF
