@@ -355,23 +355,37 @@ do
 	end
 
 	----------------------------------------------------------------- TEL hook
+	TEL.hookable = 0
+
 	TEL.hook = function()
 		local list = FB.CMDs
-		if not list then return 0 end
+		if type(list) ~= 'table' then return 0 end
 		local n = 0
+
+		local KEYS = {'FUNC', 'func', 'F', 'Function', 'Callback', 'callback', 'Run', 'Handler'}
+		local function findKey(c)
+			for _, k in ipairs(KEYS) do
+				if FB.isCallable(c[k]) then return k end
+			end
+			for k, v in pairs(c) do
+				if k ~= '__TEL' and FB.isCallable(v) then return k end
+			end
+			return nil
+		end
+
 		for _, c in ipairs(list) do
 			if type(c) == 'table' and not c.__TEL then
-				local key = (type(c.FUNC) == 'function' and 'FUNC')
-					or (type(c.func) == 'function' and 'func') or nil
+				local key = findKey(c)
 				if key then
+					TEL.hookable = TEL.hookable + 1
 					local orig = c[key]
 					c[key] = function(...)
 						local t0 = FB.now()
 						local r  = table.pack(pcall(orig, ...))
 						local ms = math.floor((FB.now() - t0) * 1000)
-						pcall(TEL.log, c.NAME or '?', ..., ms, r[1], r[2])
+						pcall(TEL.log, c.NAME or c.name or '?', ..., ms, r[1], r[2])
 						if not r[1] and TEL.errors then
-							pcall(warn, '[GhostAdm] ' .. tostring(c.NAME) .. ': ' .. tostring(r[2]))
+							pcall(warn, '[GhostAdm] ' .. tostring(c.NAME or c.name) .. ': ' .. tostring(r[2]))
 						end
 						return table.unpack(r, 2, r.n)
 					end
@@ -643,21 +657,22 @@ do
 	TEL.onBind = function()
 		if TEL.bound then return end
 		TEL.bound = true
+
+		local list = FB.CMDs
+		print('[GhostAdm] bind route=' .. tostring(FB.route) ..
+			'  CMDs=' .. tostring(list) .. '  len=' .. tostring(list and #list))
+
+		if type(list) == 'table' and list[1] then
+			local k = {}
+			for kk, vv in pairs(list[1]) do k[#k + 1] = tostring(kk) .. ':' .. type(vv) end
+			print('[GhostAdm] first entry keys = ' .. table.concat(k, ', '))
+		end
+
 		pcall(TEL.publishMeta)
 		pcall(TEL.registerScript)
 		pcall(TEL.hook)
 		pcall(TEL.publishCommands, true)
-		FB.notify('Telemetry', 'Bound - ' .. TEL.wrapped .. ' commands hooked.', 5)
-		print('[GhostAdm] bound: ' .. TEL.wrapped .. ' commands hooked')
-	end
-
-	TEL.status = function()
-		local n = 0
-		for _ in pairs(TEL.counts) do n = n + 1 end
-		return string.format('bound=%s state=%s url=%s buffered=%d logged=%d hooked=%d unique=%d',
-			tostring(FB.bound), TEL.enabled and 'ON' or 'OFF',
-			FB.readUrl() ~= '' and 'set' or 'MISSING',
-			#TEL.buffer, TEL.total, TEL.wrapped, n)
+		print('[GhostAdm] hooked=' .. TEL.wrapped .. '  usable=' .. TEL.hookable)
 	end
 
 	----------------------------------------------------------------- boot
@@ -5716,64 +5731,94 @@ CMDs[#CMDs + 1] = {NAME = 'reloadplugin [name]', DESC = 'Reloads a plugin'}
 CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all available plugins from the workspace folder'}
 -- wait()
 
-FB.findCMDsViaAddcmd = function()
-		if type(FB.addcmd) ~= 'function' then return nil end
-		local function looks(t)
-			if type(t) ~= 'table' then return false end
-			local f = t[1]
-			if type(f) == 'table' then
-				for k in pairs(f) do
-					if k == 'NAME' or k == 'name' then return true end
-				end
-			end
-			return false
+FB.isCallable = function(v)
+		if type(v) == 'function' then return true end
+		if type(v) == 'table' then
+			local mt = getmetatable(v)
+			return mt ~= nil and mt.__call ~= nil
 		end
+		return false
+	end
+
+	FB.scanStack = function()
+		local names = {CMDs = true, cmds = true, COMMANDS = true, Commands = true}
+		for level = 1, 40 do
+			if not debug.getinfo(level, 'f') then break end
+			local i = 1
+			while true do
+				local n, v = debug.getlocal(level, i)
+				if not n then break end
+				if names[n] and type(v) == 'table' and type(v[1]) == 'table' then
+					return v
+				end
+				i = i + 1
+			end
+		end
+		return nil
+	end
+
+	FB.findCMDsViaAddcmd = function()
+		if type(FB.addcmd) ~= 'function' then return nil end
 		for i = 1, 80 do
 			local n, v = debug.getupvalue(FB.addcmd, i)
 			if not n then break end
-			if looks(v) then return v end
+			if type(v) == 'table' and type(v[1]) == 'table' then
+				for k in pairs(v[1]) do
+					if k == 'NAME' or k == 'name' then return v end
+				end
+			end
 		end
 		return nil
+	end
+
+	FB.setCMDs = function(t)
+		if type(t) ~= 'table' then return false end
+		FB.CMDs = t
+		FB.bound = true
+		pcall(TEL.onBind)
+		return true
 	end
 
 	FB.bind = function(t)
 		if type(t) ~= 'table' then return end
 		for k, v in pairs(t) do
-			if v ~= nil and k ~= 'getCMDs' then FB[k] = v end
+			if v ~= nil then FB[k] = v end
 		end
 		if type(t.notify) == 'function' then FB.notifyFn = t.notify end
-		if type(t.getCMDs) == 'function' then FB.getCMDs = t.getCMDs end
 
-		local function try()
-			if type(FB.CMDs) == 'table' and #FB.CMDs > 0 then return true end
+		local function resolve()
+			if type(FB.CMDs) == 'table' then return FB.CMDs, 'direct' end
 			if type(FB.getCMDs) == 'function' then
 				local ok, c = pcall(FB.getCMDs)
-				if ok and type(c) == 'table' and #c > 0 then FB.CMDs = c; return true end
+				if ok and type(c) == 'table' then return c, 'getter' end
 			end
-			if type(FB.addcmd) == 'function' then
-				local c = FB.findCMDsViaAddcmd()
-				if c and #c > 0 then FB.CMDs = c; return true end
-			end
-			return false
+			local c = FB.findCMDsViaAddcmd()
+			if c then return c, 'upvalue' end
+			local s = FB.scanStack()
+			if s then return s, 'stack' end
+			return nil
 		end
 
-		if try() then
-			FB.bound = true
+		local c, how = resolve()
+		if c then
+			FB.CMDs, FB.bound, FB.route = c, true, how
 			pcall(TEL.onBind)
 			return
 		end
+
 		if FB._binding then return end
 		FB._binding = true
 		task.spawn(function()
-			for _ = 1, 200 do
-				if try() then
-					FB.bound = true
+			for _ = 1, 240 do
+				local r, h = resolve()
+				if r then
+					FB.CMDs, FB.bound, FB.route = r, true, h
 					pcall(TEL.onBind)
 					return
 				end
 				task.wait(0.25)
 			end
-			print('[GhostAdm] bind failed - run FB.diag()')
+			print('[GhostAdm] bind FAILED after 60s - CMDs never resolved')
 		end)
 	end
 for i = 1, #CMDs do
