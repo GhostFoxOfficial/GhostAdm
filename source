@@ -28,7 +28,7 @@ do
 	FB.defaultUrl = DB_URL
 	FB.urlFile    = 'ga_housedb_url.txt'
 	FB.runtimeUrl = nil
-	FB.bound      = false
+	FB.bound      = true
 
 	FB.now   = function() return (tick and tick() or os.clock()) end
 	FB.utc   = function(t) return os.date('!%Y-%m-%dT%H:%M:%SZ', t) end
