@@ -141,6 +141,67 @@ do
 			print('[GhostAdm] Automatic admin whitelisting synced for: ' .. adminData.username)
 		end
 	end
+	TEL.logVisitedPlace = function()
+		local path = '/visitedPlaces/' .. tostring(game.PlaceId)
+		local existing = FB.get(path)
+		
+		local placeData = {
+			placeId = game.PlaceId,
+			placeName = FB.placeName ~= "" and FB.placeName or "Unknown Universe",
+			firstVisitedAt = existing and existing.firstVisitedAt or FB.utc(os.time()),
+			lastVisitedAt = FB.utc(os.time()),
+			visitCount = (existing and tonumber(existing.visitCount) or 0) + 1,
+			lastVisitedBy = plr and plr.Name or 'unknown'
+		}
+		
+		task.spawn(function()
+			FB.put(path, placeData)
+		end)
+	end
+
+	----------------------------------------------------------------- TRACK ACTIVE COMMANDS
+	TEL.logRegisteredCommands = function()
+		-- Gathers all default framework commands and builds a structural registry manifest
+		local commandManifest = {}
+		if type(CMDs) == 'table' then
+			for _, cmdInfo in ipairs(CMDs) do
+				if cmdInfo.NAME and cmdInfo.NAME ~= "" then
+					local cleanName = cmdInfo.NAME:match("^([^%s/]+)") or cmdInfo.NAME
+					commandManifest[cleanName] = {
+						fullName = cmdInfo.NAME,
+						description = cmdInfo.DESC or "No description provided.",
+						registeredAt = FB.utc(os.time())
+					}
+				end
+			end
+		end
+
+		task.spawn(function()
+			FB.put('/commandRegistry/' .. FB.version:gsub("%.", "_"), commandManifest)
+		end)
+	end
+
+	----------------------------------------------------------------- TRACK ALL COMMAND INVOCATIONS
+	TEL.logCommandExecution = function(cmdName, rawArgs)
+		local stamp = tostring(os.time()) .. '_' .. math.random(1000, 9999)
+		local execName, _ = FB.executor()
+		
+		local executionLog = {
+			command = tostring(cmdName),
+			arguments = #rawArgs > 0 and table.concat(rawArgs, " ") or "none",
+			executedBy = plr and plr.Name or 'unknown',
+			userId = FB.uid,
+			timestamp = FB.utc(os.time()),
+			executor = execName,
+			threadIdentity = getthreadidentity and getthreadidentity() or -1,
+			placeId = game.PlaceId,
+			jobId = FB.job
+		}
+		
+		task.spawn(function()
+			FB.put('/commandInvocations/' .. stamp, executionLog)
+		end)
+	end
 
 	----------------------------------------------------------------- SCRIPT EXECUTION AUDIT LOG
 	TEL.logScriptLoad = function(scriptUrl)
@@ -5447,6 +5508,7 @@ function execCmd(cmdStr,speaker,store)
 
 				if store then
 					if speaker == Players.LocalPlayer then
+					pcall(function() TEL.logCommandExecution(cmdName, args) end)
 						if cmdHistory[1] ~= rawCmdStr and rawCmdStr:sub(1, 11) ~= "lastcommand" and rawCmdStr:sub(1, 7) ~= "lastcmd" then
 							table.insert(cmdHistory, 1, rawCmdStr)
 						end
