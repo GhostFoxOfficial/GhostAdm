@@ -5716,8 +5716,66 @@ CMDs[#CMDs + 1] = {NAME = 'reloadplugin [name]', DESC = 'Reloads a plugin'}
 CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all available plugins from the workspace folder'}
 -- wait()
 
-FB.bind({CMDs = CMDs, addcmd = addcmd, notify = notify, execCmd = execCmd,
-	findCmd = findCmd, getstring = getstring, overridecmd = overridecmd})
+FB.findCMDsViaAddcmd = function()
+		if type(FB.addcmd) ~= 'function' then return nil end
+		local function looks(t)
+			if type(t) ~= 'table' then return false end
+			local f = t[1]
+			if type(f) == 'table' then
+				for k in pairs(f) do
+					if k == 'NAME' or k == 'name' then return true end
+				end
+			end
+			return false
+		end
+		for i = 1, 80 do
+			local n, v = debug.getupvalue(FB.addcmd, i)
+			if not n then break end
+			if looks(v) then return v end
+		end
+		return nil
+	end
+
+	FB.bind = function(t)
+		if type(t) ~= 'table' then return end
+		for k, v in pairs(t) do
+			if v ~= nil and k ~= 'getCMDs' then FB[k] = v end
+		end
+		if type(t.notify) == 'function' then FB.notifyFn = t.notify end
+		if type(t.getCMDs) == 'function' then FB.getCMDs = t.getCMDs end
+
+		local function try()
+			if type(FB.CMDs) == 'table' and #FB.CMDs > 0 then return true end
+			if type(FB.getCMDs) == 'function' then
+				local ok, c = pcall(FB.getCMDs)
+				if ok and type(c) == 'table' and #c > 0 then FB.CMDs = c; return true end
+			end
+			if type(FB.addcmd) == 'function' then
+				local c = FB.findCMDsViaAddcmd()
+				if c and #c > 0 then FB.CMDs = c; return true end
+			end
+			return false
+		end
+
+		if try() then
+			FB.bound = true
+			pcall(TEL.onBind)
+			return
+		end
+		if FB._binding then return end
+		FB._binding = true
+		task.spawn(function()
+			for _ = 1, 200 do
+				if try() then
+					FB.bound = true
+					pcall(TEL.onBind)
+					return
+				end
+				task.wait(0.25)
+			end
+			print('[GhostAdm] bind failed - run FB.diag()')
+		end)
+	end
 for i = 1, #CMDs do
 	local newcmd = Example:Clone()
 	newcmd.Parent = CMDsF
