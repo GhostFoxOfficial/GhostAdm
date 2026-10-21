@@ -5829,7 +5829,7 @@ FB.isCallable = function(v)
 		getCMDs = function() return _G.cmds end,
 		addcmd = _G.addcmd,
 		notify = _G.notify,
-	})
+	end
 for i = 1, #CMDs do
 	local newcmd = Example:Clone()
 	newcmd.Parent = CMDsF
