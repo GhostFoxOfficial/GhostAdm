@@ -355,43 +355,32 @@ do
 	end
 
 	----------------------------------------------------------------- TEL hook
-	TEL.hookable = 0
-
 	TEL.hook = function()
-		local list = FB.CMDs
-		if type(list) ~= 'table' then return 0 end
 		local n = 0
-
-		local KEYS = {'FUNC', 'func', 'F', 'Function', 'Callback', 'callback', 'Run', 'Handler'}
-		local function findKey(c)
-			for _, k in ipairs(KEYS) do
-				if FB.isCallable(c[k]) then return k end
-			end
-			for k, v in pairs(c) do
-				if k ~= '__TEL' and FB.isCallable(v) then return k end
-			end
-			return nil
-		end
-
-		for _, c in ipairs(list) do
-			if type(c) == 'table' and not c.__TEL then
-				local key = findKey(c)
-				if key then
-					TEL.hookable = TEL.hookable + 1
-					local orig = c[key]
-					c[key] = function(...)
-						local t0 = FB.now()
-						local r  = table.pack(pcall(orig, ...))
-						local ms = math.floor((FB.now() - t0) * 1000)
-						pcall(TEL.log, c.NAME or c.name or '?', ..., ms, r[1], r[2])
-						if not r[1] and TEL.errors then
-							pcall(warn, '[GhostAdm] ' .. tostring(c.NAME or c.name) .. ': ' .. tostring(r[2]))
+		for _, list in ipairs(FB.dispatchTables()) do
+			for _, c in ipairs(list) do
+				if type(c) == 'table' and not c.__TEL then
+					local key
+					for _, k in ipairs({'FUNC', 'func', 'F', 'Function', 'Callback'}) do
+						if FB.isCallable(c[k]) then key = k; break end
+					end
+					if key then
+						local orig = c[key]
+						c[key] = function(...)
+							local t0 = FB.now()
+							local r  = table.pack(pcall(orig, ...))
+							local ms = math.floor((FB.now() - t0) * 1000)
+							pcall(TEL.log, c.NAME or c.name or '?', ..., ms, r[1], r[2])
+							if not r[1] and TEL.errors then
+								pcall(warn, '[GhostAdm] ' .. tostring(c.NAME or c.name) .. ': ' .. tostring(r[2]))
+							end
+							return table.unpack(r, 2, r.n)
 						end
-						return table.unpack(r, 2, r.n)
+						TEL.wrapped = TEL.wrapped + 1
+						TEL.hookable = TEL.wrapped
+						n = n + 1
 					end
 					c.__TEL = true
-					TEL.wrapped = TEL.wrapped + 1
-					n = n + 1
 				end
 			end
 		end
@@ -400,79 +389,48 @@ do
 
 	----------------------------------------------------------------- TEL registry
 	TEL.snapshot = function()
-		local list = FB.CMDs
-		if not list or #list == 0 then return nil, nil, nil end
+		local tables = FB.dispatchTables()
+
+		local descs = {}
+		for _, list in ipairs(tables) do
+			for _, c in ipairs(list) do
+				if type(c) == 'table' and c.NAME and c.DESC and c.DESC ~= '' then
+					descs[c.NAME] = c.DESC
+				end
+			end
+		end
+
 		local out, index, aliasMap = {}, {}, {}
-		for _, c in ipairs(list) do
-			if type(c) == 'table' and c.NAME then
-				local aliases = nil
-				if type(c.ALIASES) == 'table' then
-					aliases = {}
-					for i, a in ipairs(c.ALIASES) do
-						aliases[i] = tostring(a)
-						aliasMap[tostring(a)] = c.NAME
+		for _, list in ipairs(tables) do
+			for _, c in ipairs(list) do
+				if type(c) == 'table' and c.NAME and not index[c.NAME] then
+					local key
+					for _, k in ipairs({'FUNC', 'func', 'F', 'Function'}) do
+						if FB.isCallable(c[k]) then key = k; break end
+					end
+					if key then
+						local aliases, al = nil, c.ALIAS or c.ALIASES
+						if type(al) == 'table' then
+							aliases = {}
+							for i, a in ipairs(al) do
+								aliases[i] = tostring(a)
+								aliasMap[tostring(a)] = c.NAME
+							end
+						end
+						local entry = {
+							name = c.NAME, aliases = aliases,
+							desc = c.DESC or descs[c.NAME],
+							plugin = (c.PLUGIN or c.PLGN) and true or nil,
+							aliasCount = aliases and #aliases or 0,
+						}
+						out[#out + 1] = {name = entry.name, aliases = aliases, desc = entry.desc, plugin = entry.plugin}
+						index[c.NAME] = entry
 					end
 				end
-				out[#out + 1] = {
-					name = c.NAME, aliases = aliases, desc = c.DESC,
-					plugin = c.PLGN and true or nil,
-				}
-				index[tostring(c.NAME)] = {
-					name = c.NAME, aliases = aliases, desc = c.DESC,
-					plugin = c.PLGN and true or nil,
-					aliasCount = aliases and #aliases or 0,
-				}
 			end
 		end
 		table.sort(out, function(a, b) return a.name < b.name end)
 		return out, index, aliasMap
-	end
-
-	TEL.publishCommands = function(force)
-		local list, index, aliasMap = TEL.snapshot()
-		if not list then return false end
-
-		local blob = {}
-		for _, e in ipairs(list) do
-			blob[#blob + 1] = e.name .. '|' .. (e.desc or '') .. '|' ..
-				(e.aliases and table.concat(e.aliases, ',') or '')
-		end
-		local h = FB.hash(table.concat(blob, '\n'))
-		if not force and h == TEL.regHash then return false end
-		TEL.regHash = h
-
-		local en = FB.executor()
-		local usage = FB.get('/commandTotals') or {}
-
-		FB.put('/commands/' .. FB.scriptName .. '@' .. TEL.version, {
-			script = FB.scriptName, version = TEL.version, hash = h,
-			count = #list, publishedAt = FB.utc(os.time()),
-			executor = en, platform = FB.platform(),
-			commands = list,
-		})
-
-		FB.put('/aliases', aliasMap)
-
-		local reg = FB.get('/commandRegistry') or {}
-		for name, e in pairs(index) do
-			local prev = reg[name] or {}
-			e.firstSeen = prev.firstSeen or FB.utc(os.time())
-			e.lastSeen  = FB.utc(os.time())
-			e.script    = FB.scriptName
-			e.version   = TEL.version
-			e.uses      = usage[name] or prev.uses or 0
-			reg[name]   = e
-		end
-		FB.put('/commandRegistry', reg)
-
-		local an = 0
-		for _ in pairs(aliasMap) do an = an + 1 end
-		FB.put('/commandRegistryMeta', {
-			script = FB.scriptName, version = TEL.version, hash = h,
-			count = #list, aliases = an,
-			updatedAt = FB.utc(os.time()), updatedBy = plr and plr.Name or '?',
-		})
-		return true
 	end
 
 	----------------------------------------------------------------- TEL env
@@ -722,10 +680,24 @@ do
 		end)
 	end)
 
-	autobind()
-	print('[GhostAdm] header loaded - db=' .. (FB.readUrl() ~= '' and 'set' or 'MISSING') ..
-		'  bound=' .. tostring(FB.bound))
-end
+	local AUTOBIND_NAMES = {'cmds', 'CMDs', 'addcmd', 'notify', 'execCmd', 'findCmd',
+		'getstring', 'overridecmd', 'removecmd', 'getPlayer', 'getRoot', 'chatMessage'}
+
+	local function autobind()
+		for _, n in ipairs(AUTOBIND_NAMES) do
+			if FB[n] == nil and _G[n] ~= nil then FB[n] = _G[n] end
+		end
+		if type(FB.notifyFn) ~= 'function' and type(_G.notify) == 'function' then
+			FB.notifyFn = _G.notify
+		end
+		if FB.bound then return true end
+		if type(FB.cmds) == 'table' and #FB.cmds > 0 then
+			FB.bound, FB.route = true, 'autobind'
+			pcall(TEL.onBind)
+			return true
+		end
+		return false
+	end
 
 task.spawn(function()
     -- Wait
@@ -5740,17 +5712,41 @@ FB.isCallable = function(v)
 		return false
 	end
 
+	FB.hasFuncs = function(t)
+		if type(t) ~= 'table' then return false end
+		for i = 1, math.min(#t, 25) do
+			local e = t[i]
+			if type(e) == 'table' and (type(e.FUNC) == 'function' or type(e.func) == 'function') then
+				return true
+			end
+		end
+		return false
+	end
+
+	-- cmds = dispatch (has FUNC). CMDs = GUI rows (no FUNC). Scan both.
+	FB.dispatchTables = function()
+		local out = {}
+		for _, v in ipairs({FB.cmds, _G.cmds, FB.CMDs, _G.CMDs}) do
+			if type(v) == 'table' then
+				local dup = false
+				for _, x in ipairs(out) do
+					if rawequal(x, v) then dup = true; break end
+				end
+				if not dup then out[#out + 1] = v end
+			end
+		end
+		return out
+	end
+
 	FB.scanStack = function()
-		local names = {CMDs = true, cmds = true, COMMANDS = true, Commands = true}
+		local names = {cmds = true, CMDs = true, COMMANDS = true, Commands = true}
 		for level = 1, 40 do
 			if not debug.getinfo(level, 'f') then break end
 			local i = 1
 			while true do
 				local n, v = debug.getlocal(level, i)
 				if not n then break end
-				if names[n] and type(v) == 'table' and type(v[1]) == 'table' then
-					return v
-				end
+				if names[n] and FB.hasFuncs(v) then return v end
 				i = i + 1
 			end
 		end
@@ -5758,39 +5754,45 @@ FB.isCallable = function(v)
 	end
 
 	FB.findCMDsViaAddcmd = function()
-		if type(FB.addcmd) ~= 'function' then return nil end
+		local fn = FB.addcmd or _G.addcmd
+		if type(fn) ~= 'function' then return nil end
 		for i = 1, 80 do
-			local n, v = debug.getupvalue(FB.addcmd, i)
+			local n, v = debug.getupvalue(fn, i)
 			if not n then break end
-			if type(v) == 'table' and type(v[1]) == 'table' then
-				for k in pairs(v[1]) do
-					if k == 'NAME' or k == 'name' then return v end
-				end
+			if n == '_ENV' and type(v) == 'table' and FB.hasFuncs(v.cmds) then
+				return v.cmds
+			elseif type(v) == 'table' and FB.hasFuncs(v) then
+				return v
 			end
 		end
 		return nil
 	end
 
-	FB.setCMDs = function(t)
-		if type(t) ~= 'table' then return false end
-		FB.CMDs = t
-		FB.bound = true
-		pcall(TEL.onBind)
-		return true
-	end
-
 	FB.bind = function(t)
-		if type(t) ~= 'table' then return end
+		t = t or {}
 		for k, v in pairs(t) do
-			if v ~= nil then FB[k] = v end
+			if v ~= nil and k ~= 'getCMDs' then FB[k] = v end
 		end
-		if type(t.notify) == 'function' then FB.notifyFn = t.notify end
+		if type(t.getCMDs) == 'function' then FB.getCMDs = t.getCMDs end
+
+		local function pull()
+			for _, n in ipairs({'cmds', 'CMDs', 'addcmd', 'notify', 'execCmd', 'findCmd',
+				'getstring', 'overridecmd', 'removecmd', 'getPlayer', 'getRoot'}) do
+				if FB[n] == nil and _G[n] ~= nil then FB[n] = _G[n] end
+			end
+			if type(FB.notifyFn) ~= 'function' and type(_G.notify) == 'function' then
+				FB.notifyFn = _G.notify
+			end
+		end
 
 		local function resolve()
-			if type(FB.CMDs) == 'table' then return FB.CMDs, 'direct' end
+			pull()
+			for _, v in ipairs({FB.cmds, _G.cmds, FB.CMDs, _G.CMDs}) do
+				if FB.hasFuncs(v) then return v, 'table' end
+			end
 			if type(FB.getCMDs) == 'function' then
 				local ok, c = pcall(FB.getCMDs)
-				if ok and type(c) == 'table' then return c, 'getter' end
+				if ok and FB.hasFuncs(c) then return c, 'getter' end
 			end
 			local c = FB.findCMDsViaAddcmd()
 			if c then return c, 'upvalue' end
@@ -5801,7 +5803,7 @@ FB.isCallable = function(v)
 
 		local c, how = resolve()
 		if c then
-			FB.CMDs, FB.bound, FB.route = c, true, how
+			FB.bound, FB.route = true, how
 			pcall(TEL.onBind)
 			return
 		end
@@ -5812,15 +5814,22 @@ FB.isCallable = function(v)
 			for _ = 1, 240 do
 				local r, h = resolve()
 				if r then
-					FB.CMDs, FB.bound, FB.route = r, true, h
+					FB.bound, FB.route = true, h
 					pcall(TEL.onBind)
 					return
 				end
 				task.wait(0.25)
 			end
-			print('[GhostAdm] bind FAILED after 60s - CMDs never resolved')
+			print('[GhostAdm] bind FAILED - cmds never resolved')
 		end)
 	end
+
+	-- the call that was missing
+	FB.bind({
+		getCMDs = function() return _G.cmds end,
+		addcmd = _G.addcmd,
+		notify = _G.notify,
+	})
 for i = 1, #CMDs do
 	local newcmd = Example:Clone()
 	newcmd.Parent = CMDsF
