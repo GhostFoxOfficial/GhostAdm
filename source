@@ -7,6 +7,8 @@ elseif set_thread_identity then
 elseif set_thread_context(8) then
     set_thread_context(8)
 end
+getgenv().FB = nil
+getgenv().TEL = nil
 
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
@@ -5198,21 +5200,6 @@ CMDs[#CMDs + 1] = {NAME = 'removeplugin / deleteplugin [name]', DESC = 'Remove a
 CMDs[#CMDs + 1] = {NAME = 'reloadplugin [name]', DESC = 'Reloads a plugin'}
 CMDs[#CMDs + 1] = {NAME = 'addallplugins / loadallplugins', DESC = 'Adds all available plugins from the workspace folder'}
 -- wait()
-
--- Chucnk
-FB.isCallable = function(v)
-    ...
-end
-
-FB.hasFuncs = function(t)
-    ...
-end
-
-FB.bind({
-    getCMDs = function() return _G.cmds end,
-    addcmd = _G.addcmd,
-    notify = _G.notify,
-})
 
 for i = 1, #CMDs do
 	local newcmd = Example:Clone()
