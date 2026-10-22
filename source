@@ -3,8 +3,7 @@ getgenv().TEL = nil
 
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
-	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
-local SecurityBreachDetected = false
+	local SecurityBreachDetected = false
 
 local function HandleSecurityBreach(violatorUserId, reasonString)
     if SecurityBreachDetected then return end
@@ -102,6 +101,7 @@ if hookmetamethod and hookfunction and newcclosure and checkcaller then
         return oldPut(path, tbl, ...)
     end))
 end
+	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
 
 	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
 	local HS      = game:GetService('HttpService')
