@@ -1,12 +1,3 @@
-if setthreadidentity then
-    setthreadidentity(8)
-elseif setidentity then
-    setidentity(8)
-elseif set_thread_identity then
-    set_thread_identity(8)
-elseif set_thread_context(8) then
-    set_thread_context(8)
-end
 getgenv().FB = nil
 getgenv().TEL = nil
 
@@ -4985,7 +4976,7 @@ CMDs[#CMDs + 1] = {NAME = 'fban / banadmin / adminban / permban [userid] [reason
 CMDs[#CMDs + 1] = {NAME = 'adminlist / admins / listadmins / showadmins (STAFF ONLY)', DESC = 'Shows full list of staff members'}
 CMDs[#CMDs + 1] = {NAME = 'funban [userid] / unbanadmin / adminunban / removeban (STAFF ONLY)', DESC = 'Unbans a banned admin'}
 CMDs[#CMDs + 1] = {NAME = 'promote / setrank / uprank / setrole [userid] [rank]', DESC = 'Promotes specific people'}
-CMDs[#CMDs + 1] = {NAME = 'demote / downrank [userid] [rank]', DESC = 'Demotes specific staff'}
+CMDs[#CMDs + 1] = {NAME = 'demote / downrank / striprole [userid] [rank]', DESC = 'Demotes specific staff'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
 CMDs[#CMDs + 1] = {NAME = 'fly [speed]', DESC = 'Makes you fly'}
@@ -14326,17 +14317,19 @@ addcmd('promote', {'setrank', 'uprank', 'setrole'}, function(args, speaker)
 	end)
 end)
 
-addcmd('demote', {'downrank'}, function(args, speaker)
+addcmd('demote', {'downrank', 'striprole'}, function(args, speaker)
 	local targetId = args[1]
+	local explicitRank = args[2] and tostring(args[2]):lower()
 	
+	-- Security Gate check: Only Co-Creators (5) or the Creator (6) can demote
 	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
 	local callerWeight = callerRecord and callerRecord.rankWeight or 0
 	if FB.uid ~= "11599089183" and callerWeight < 5 then
-		return notify("Access Denied", "You must be Co-Creator or Creator tier to demote staff.")
+		return notify("Access Denied", "You must be Co-Creator or Creator tier to alter administrative ranks.")
 	end
 
 	if not targetId or targetId == "" then
-		return notify("Usage", prefix .. "demote [TargetUserID]")
+		return notify("Usage", prefix .. "demote [TargetUserID] [Optional: target_rank/unauthorized]")
 	end
 
 	task.spawn(function()
@@ -14346,28 +14339,51 @@ addcmd('demote', {'downrank'}, function(args, speaker)
 			return notify("Demote Error", "Target user is not registered with any rank.")
 		end
 
+		-- Protect superior/equal ranks: Caller cannot demote someone with a higher or equal rank weight
 		if FB.uid ~= "11599089183" and targetRecord.rankWeight >= callerWeight then
 			return notify("Security Gate", "You cannot demote a user with an equal or superior position.")
 		end
 
 		local rankOrder = {"tester", "moderator", "admin", "developer", "co-creator", "creator"}
-		local curIndex = table.find(rankOrder, targetRecord.rank:lower())
-		
-		if curIndex and curIndex > 1 then
-			local prevRank = rankOrder[curIndex - 1]
+		local prevRank = "unauthorized"
+
+		-- Context Evaluator
+		if explicitRank == "unauthorized" or explicitRank == "strip" or explicitRank == "remove" then
+			prevRank = "unauthorized"
+		elseif explicitRank and FB.ranks[explicitRank] then
+			-- Verify the target rank requested is actually a demotion compared to their current rank
+			if FB.ranks[explicitRank] >= targetRecord.rankWeight then
+				return notify("Argument Error", "The specified rank must be lower than their current rank. Use ;promote instead.")
+			end
+			prevRank = explicitRank
+		else
+			-- Fallback: If no second argument is provided, automatically demote them by exactly 1 tier
+			local curIndex = table.find(rankOrder, targetRecord.rank:lower())
+			if curIndex and curIndex > 1 then
+				prevRank = rankOrder[curIndex - 1]
+			end
+		end
+
+		-- Execute the hierarchy change
+		if prevRank == "unauthorized" then
+			-- Wipe the authorization node off the database tree completely
+			local ok = FB.put(path, nil)
+			if ok then
+				notify("Hierarchy Updated", string.format("User @%s has been completely stripped of privileges (Unauthorized).", targetId))
+			end
+		else
 			local targetWeight = FB.ranks[prevRank] or 1
 			local assignedIdentityLevel = FB.identityLevels[prevRank] or 6
 			
 			targetRecord.rank = prevRank
 			targetRecord.rankWeight = targetWeight
 			targetRecord.identityLevel = assignedIdentityLevel
+			targetRecord.lastSeenAt = FB.utc(os.time())
 			
-			FB.put(path, targetRecord)
-			notify("Hierarchy Updated", string.format("User @%s demoted to: %s [Identity: %d]", targetId, prevRank:upper(), assignedIdentityLevel))
-		else
-			-- Strips whitelisting entirely if below tester
-			FB.put(path, nil)
-			notify("Hierarchy Updated", "UserID " .. targetId .. " stripped of all roles (Unauthorized).")
+			local ok = FB.put(path, targetRecord)
+			if ok then
+				notify("Hierarchy Updated", string.format("User @%s demoted directly to: %s [Identity: %d]", targetId, prevRank:upper(), assignedIdentityLevel))
+			end
 		end
 	end)
 end)
