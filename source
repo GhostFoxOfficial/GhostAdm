@@ -13938,6 +13938,13 @@ addcmd('corekill', {}, function(args, speaker)
 end)
 
 addcmd('elevatestate', {}, function(args, speaker)
+	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 4 then -- rank weight
+		return notify("Access Denied", "This command is restricted to higher-up staff tiers.")
+	end
+
     if not setthreadidentity then return end
     -- Outta bounds
     setthreadidentity(8)
