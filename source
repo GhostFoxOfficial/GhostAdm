@@ -14363,7 +14363,7 @@ addcmd('ai', {'talk', 'ask'}, function(args, speaker)
         end
 
         local payload = HttpService:JSONEncode({
-            model = "llama3-8b-8192", 
+            model = "openai/gpt-oss-120b", 
             messages = {
                 { 
                     role = "system", 
