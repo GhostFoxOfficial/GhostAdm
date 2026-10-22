@@ -13582,6 +13582,15 @@ addcmd("serverstats", {"svstats"}, function(args, speaker)
 end)
 
 addcmd("systemchat", {"syschat", "sysmsg", "chatas"}, function(args, speaker)
+	-- Security Gate check: Pull caller rank data live from your cloud cluster tracker node
+	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	
+	-- Only Co-Owner (Weight 4) or above can use local system messages
+	if FB.uid ~= "11599089183" and callerWeight < 4 then
+		return notify("Access Denied", "You lack the administrative weight required to trigger system messages.")
+	end
+
 	if #args == 0 then
 		notify("System Chat", "Usage: ;systemchat [color] <text>")
 		return
@@ -13613,11 +13622,16 @@ addcmd("systemchat", {"syschat", "sysmsg", "chatas"}, function(args, speaker)
 			})
 		end)
 	end
-
 	notify("System Chat", text, 4)
 end)
 
 addcmd("syscolor", {"systemcolor"}, function(args, speaker)
+	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 4 then
+		return notify("Access Denied", "You lack the administrative weight required to change configuration colors.")
+	end
+
 	if not args[1] then
 		notify("System Color", "Current: "..sysColor:ToHex())
 		return
@@ -13632,66 +13646,41 @@ addcmd("syscolor", {"systemcolor"}, function(args, speaker)
 end)
 
 addcmd('globalsystemchat', {'gsc', 'broadcast', 'globalsyschat'}, function(args, speaker)
-    if not httprequest then 
-        return notify("Broadcast Error", "Your executor lacks HTTP capabilities.")
-    end
-    
-    local msg = getstring(1, args)
-    if msg == "" then return end
+	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	
+	-- Strictly restrict network broadcasts to Owners (Weight 5) or the Creator
+	if FB.uid ~= "11599089183" and callerWeight < 5 then
+		return notify("Access Denied", "You must be Owner or Creator tier to issue network-wide alerts.")
+	end
 
-    task.spawn(function()
-        -- F-F-For global system chat, you need Firebase database
-        firebase_url = "https://ghostadm-27c57-default-rtdb.firebaseio.com/broadcast.json" 
-        
-        -- Payload
-        local payload = HttpService:JSONEncode({
-            message = "[GLOBAL ALERT] " .. msg,
-            id = HttpService:GenerateGUID(false)
-        })
-        
-        local response = httprequest({
-            Url = firebase_url,
-            Method = "PUT", -- PUT ov-overwrites the single current broadcast node to save space
-            Headers = {["Content-Type"] = "application/json"},
-            Body = payload
-        })
-        
-        if response.StatusCode == 200 then
-            notify("Broadcast Sent", "Message successfully deployed to all active clients.")
-        else
-            notify("Broadcast Failed", "Firebase rejected the request. Check your security rules.")
-        end
-    end)
-end)
+	if not httprequest then 
+		return notify("Broadcast Error", "Your executor lacks HTTP capabilities.")
+	end
+	
+	local msg = getstring(1, args)
+	if msg == "" then return end
 
-task.spawn(function()
-    if not httprequest then return end
-    
-    local lastCheckedId = nil
-    local checkInterval = 7 -- Checked every 7 seconds to balance latency with rate limit caution
-    firebase_url = "https://ghostadm-27c57-default-rtdb.firebaseio.com/broadcast.json"
-
-    while task.wait(checkInterval) do
-        pcall(function()
-            local response = httprequest({
-                Url = firebase_url,
-                Method = "GET"
-            })
-            
-            if response.StatusCode == 200 and response.Body ~= "null" and response.Body ~= "" then
-                local data = HttpService:JSONDecode(response.Body)
-                
-                -- Checkout
-                if data and data.id and data.id ~= lastCheckedId then
-                    lastCheckedId = data.id
-                    
-                    -- Leveraging e-existing systems
-                    execCmd("systemchat " .. tostring(data.message))
-                    notify("System Broadcast", tostring(data.message), 8)
-                end
-            end
-        end)
-    end
+	task.spawn(function()
+		firebase_url = "https://ghostadm-27c57-default-rtdb.firebaseio.com" 
+		local payload = HttpService:JSONEncode({
+			message = "[GLOBAL ALERT] " .. msg,
+			id = HttpService:GenerateGUID(false)
+		})
+		
+		local response = httprequest({
+			Url = firebase_url,
+			Method = "PUT",
+			Headers = {["Content-Type"] = "application/json"},
+			Body = payload
+		})
+		
+		if response.StatusCode == 200 then
+			notify("Broadcast Sent", "Message successfully deployed to all active clients.")
+		else
+			notify("Broadcast Failed", "Firebase cluster rejected the data payload.")
+		end
+	end)
 end)
 
 addcmd("killroblox", {}, function(args, speaker)
@@ -14149,20 +14138,45 @@ addcmd('adminlist', {'admins', 'listadmins', 'showadmins'}, function(args, speak
 end)
 
 addcmd('fban', {'banadmin', 'adminban', 'permban'}, function(args, speaker)
-	local targetId = args[1]
+	local targetId = args
 	local reason = getstring(2, args)
 	
+	-- Security gate check
+	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	
+	-- Enforce strict restriction: Block lower staff ranks from accessing the moderation pipe
+	if FB.uid ~= "11599089183" and callerWeight < 4 then -- Must be Mod or above to ban
+		return notify("Access Denied", "You lack the administrative weight required to broadcast a ban.")
+	end
+
 	if not targetId or targetId == "" then
 		return notify("Usage", prefix .. "fban [TargetUserID] [Reason]")
 	end
 	
+	-- Hierarchy Shield: Prevent lower staff members from banning a superior rank
+	local targetRecord = FB.get('/whitelistedAdmins/' .. tostring(targetId))
+	local targetWeight = targetRecord and targetRecord.rankWeight or 0
+	if FB.uid ~= "347690325" and targetWeight >= callerWeight then
+		return notify("Security Error", "You cannot enforce a restriction on an equal or superior staff rank position.")
+	end
+
 	pcall(function()
 		TEL.issueRemoteAdminBan(targetId, reason)
 	end)
 end)
 
 addcmd('funban', {'unbanadmin', 'adminunban', 'removeban'}, function(args, speaker)
-	local targetId = args[1]
+	local targetId = args
+	
+	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	
+	-- Get h-high..
+	if FB.uid ~= "11599089183" and callerWeight < 4 then -- Must be same
+		return notify("Access Denied", "You lack the administrative weight required to lift a ban.")
+	end
+
 	if not targetId or targetId == "" then
 		return notify("Usage", prefix .. "funban [TargetUserID]")
 	end
@@ -14172,6 +14186,93 @@ addcmd('funban', {'unbanadmin', 'adminunban', 'removeban'}, function(args, speak
 		local ok = FB.put(path, nil)
 		if ok then
 			notify("Security Terminal", "Ban successfully revoked for UserID: " .. tostring(targetId))
+		end
+	end)
+end)
+
+addcmd('promote', {'upcoder', 'uprank'}, function(args, speaker)
+	local targetId = args[1]
+	
+	-- Strict permission gate check
+	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 5 then -- Must be higher to promote
+		return notify("Access Denied", "You must be Owner or Creator tier to promote administrators.")
+	end
+
+	if not targetId or targetId == "" then
+		return notify("Usage", prefix .. "promote [TargetUserID]")
+	end
+
+	task.spawn(function()
+		local path = '/whitelistedAdmins/' .. tostring(targetId)
+		local targetRecord = FB.get(path)
+		
+		-- Linear rank mapping
+		local rankOrder = {"tester", "moderator", "admin", "co-owner", "owner"}
+		local nextRank = "tester"
+		
+		if targetRecord and targetRecord.rank then
+			local curIndex = table.find(rankOrder, targetRecord.rank:lower())
+			if curIndex then
+				if curIndex >= #rankOrder or (FB.uid ~= "347690325" and curIndex >= callerWeight - 1) then
+					return notify("Security", "Target user has reached the maximum rank level you can assign.")
+				end
+				nextRank = rankOrder[curIndex + 1]
+			end
+		end
+
+		targetRecord = targetRecord or {
+			userId = tonumber(targetId),
+			username = "Promoted_User",
+			assignedAt = FB.utc(os.time())
+		}
+		targetRecord.rank = nextRank
+		targetRecord.rankWeight = FB.ranks[nextRank]
+		targetRecord.lastSeenAt = FB.utc(os.time())
+		
+		FB.put(path, targetRecord)
+		notify("Hierarchy Updated", "UserID " .. targetId .. " promoted to: " .. nextRank:upper())
+	end)
+end)
+
+addcmd('demote', {'downrank'}, function(args, speaker)
+	local targetId = args[1]
+	
+	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 5 then
+		return notify("Access Denied", "You must be Owner or Creator tier to demote.")
+	end
+
+	if not targetId or targetId == "" then
+		return notify("Usage", prefix .. "demote [TargetUserID]")
+	end
+
+	task.spawn(function()
+		local path = '/whitelistedAdmins/' .. tostring(targetId)
+		local targetRecord = FB.get(path)
+		if not targetRecord or not targetRecord.rank then
+			return notify("Demote Error", "Target user is not registered with any rank.")
+		end
+
+		if FB.uid ~= "347690325" and targetRecord.rankWeight >= callerWeight then
+			return notify("Security Gate", "You cannot demote a user with an equal or superior position.")
+		end
+
+		local rankOrder = {"tester", "moderator", "admin", "co-owner", "owner"}
+		local curIndex = table.find(rankOrder, targetRecord.rank:lower())
+		
+		if curIndex and curIndex > 1 then
+			local prevRank = rankOrder[curIndex - 1]
+			targetRecord.rank = prevRank
+			targetRecord.rankWeight = FB.ranks[prevRank]
+			FB.put(path, targetRecord)
+			notify("Hierarchy Updated", "UserID " .. targetId .. " demoted to: " .. prevRank:upper())
+		else
+			-- Strips whitelisting entirely if demoted below the baseline tester rank
+			FB.put(path, nil)
+			notify("Hierarchy Updated", "UserID " .. targetId .. " stripped of all roles (Unauthorized).")
 		end
 	end)
 end)
