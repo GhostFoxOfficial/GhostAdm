@@ -7454,7 +7454,7 @@ addcmd("autorejoin", {"autorj"}, function(args, speaker)
 end)
 
 addcmd("serverhop", {"shop"}, function(args, speaker)
-	-- thanks to Amity for fixing
+	-- thanks to me for fixing
 	local servers = {}
 	local req = game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true")
 	local body = HttpService:JSONDecode(req)
@@ -13528,6 +13528,12 @@ addcmd('removecmd',{'deletecmd'},function(args, speaker)
 end)
 
 addcmd("run", {"exec", "load"}, function(args, speaker)
+local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 3 then
+		return notify("Access Denied", "This command is restricted to higher-up staff tiers.")
+	end
+	
 	local targetUrl = args[1]
 	if targetUrl and targetUrl ~= "" then
 		pcall(function() TEL.logScriptLoad(targetUrl) end)
@@ -13917,11 +13923,23 @@ addcmd("gh0stGUI", {}, function(args, speaker)
 end)
 
 addcmd("servercrasher", {"svcrasher", "serverdestroyer"}, function(args, speaker)
+local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 3 then
+		return notify("Access Denied", "This command is restricted to higher-up staff tiers.")
+	end
+	
     notify("Loading", "Hold on a sec")
     loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostFoxOfficial/backup/refs/heads/main/servercrasher.lua"))()
 end)
 
 addcmd('corekill', {}, function(args, speaker)
+local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 4 then
+		return notify("Access Denied", "This command is restricted to higher-up staff tiers.")
+	end
+	
     if not setthreadidentity then return end
     setthreadidentity(8) -- C-Core tier
     
@@ -13972,10 +13990,22 @@ addcmd("hexexplorer", {}, function(args, speaker)
     loadstring(game:HttpGet("https://raw.githubusercontent.com/GhostFoxOfficial/backup/refs/heads/main/hexexplorer.lua"))() end)
     
 addcmd("backdoor", {"serverbreach", "fedestroyer"}, function(args, speaker)
+local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 3 then
+		return notify("Access Denied", "This command is restricted to higher-up staff tiers.")
+	end
+	
     notify("Loading", "Hold on a sec")
     loadstring(game:HttpGet("https://scriptblox.com/raw/Universal-Script-Epic-Backdoor-SS-Executor-227858"))() end)
 
 addcmd('require', {'runmodule', 'modulescript'}, function(args, speaker)
+local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 3 then
+		return notify("Access Denied", "This command is restricted to higher-up staff tiers.")
+	end
+	
     -- Utilizing the native script string parser to collect the asset parameter block
     local rawInput = getstring(1, args)
     if not rawInput or rawInput == "" then
@@ -14055,6 +14085,12 @@ addcmd('require', {'runmodule', 'modulescript'}, function(args, speaker)
 end)
 
 addcmd('ss', {'serverexec'}, function(args, speaker)
+local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 3 then
+		return notify("Access Denied", "This command is restricted to higher-up staff tiers.")
+	end
+	
     -- kkk
     -- Lua into gaem
     local rawCode = getstring(1, args)
@@ -14110,6 +14146,12 @@ addcmd('scanbackdoor', {'scan', 'checkss', 'findbackdoor'}, function(args, speak
 end)
 
 addcmd('adminlist', {'admins', 'listadmins', 'showadmins'}, function(args, speaker)
+local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	if FB.uid ~= "11599089183" and callerWeight < 2 then
+		return notify("Access Denied", "This command is restricted to higher-up staff tiers.")
+	end
+	
 	notify("Admin List", "Querying Firebase whitelisted records...", 3)
 	
 	task.spawn(function()
