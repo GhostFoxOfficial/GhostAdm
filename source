@@ -13660,8 +13660,8 @@ addcmd('globalsystemchat', {'gsc', 'broadcast', 'globalsyschat'}, function(args,
 	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
 	local callerWeight = callerRecord and callerRecord.rankWeight or 0
 	
-	-- Strictly restrict network broadcasts to Owners (Weight 5) or the Creator
-	if FB.uid ~= "11599089183" and callerWeight < 5 then
+	-- Strictly restrict network broadcasts to Co-Owners (Weight 4) or above
+	if FB.uid ~= "11599089183" and callerWeight < 4 then
 		return notify("Access Denied", "You must be Owner or Creator tier to issue network-wide alerts.")
 	end
 
