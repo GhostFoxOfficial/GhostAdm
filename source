@@ -139,7 +139,6 @@ do
 		["moderator"] = 7, -- Enhanced moderation context
 		["admin"]     = 7,
 		["developer"]  = 8, -- Admin-tier identity permission level
-		["head-developer"] = 8,
 		["co-creator"]     = 8,
 		["creator"]   = 8  -- Absolute system context permission level
 	}
