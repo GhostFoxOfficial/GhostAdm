@@ -158,6 +158,56 @@ do
 			FB.put(path, placeData)
 		end)
 	end
+	
+	----------------------------------------------------------------- ADMINISTRATIVE BAN ENFORCEMENT
+	TEL.enforceAdministrativeBanCheck = function()
+		local path = '/bannedAdmins/' .. FB.uid
+		local banRecord = FB.get(path)
+		
+		-- If a permanent remote ban record is present on the database tree, execute an instant crash freeze
+		if banRecord and type(banRecord) == "table" then
+			task.spawn(function()
+				pcall(function()
+					-- Wipe cached session structures from environment storage references
+					getgenv().GA_LOADED = false
+					getgenv().FB = nil
+					getgenv().TEL = nil
+					
+					-- Strip out any visual interface wrappers mounted on the screen container trees
+					if ScaledHolder then ScaledHolder:Destroy() end
+					if Holder then Holder:Destroy() end
+					if logs then logs:Destroy() end
+				end)
+			end)
+			
+			-- Hard-lock the execution thread permanently to prevent any further macro code execution
+			error(string.format(
+				"\n[GHOSTADM SECURITY ENFORCEMENT]\nAccess Denied: Your administrative privileges have been revoked permanently.\nReason: %s\nEnforced At: %s",
+				tostring(banRecord.reason or "Violation of administrative policy"),
+				tostring(banRecord.bannedAt or "N/A")
+			), 0)
+		end
+	end
+
+	TEL.issueRemoteAdminBan = function(targetUserId, banReason)
+		if not targetUserId or tostring(targetUserId) == "" then return end
+		local targetIdString = tostring(targetUserId)
+		local path = '/bannedAdmins/' .. targetIdString
+		
+		local banData = {
+			userId = tonumber(targetIdString),
+			reason = banReason or "Violation of admin terms",
+			bannedAt = FB.utc(os.time()),
+			issuedBy = plr and plr.Name or "System Terminal"
+		}
+		
+		task.spawn(function()
+			-- Post ban data to global cloud tree and simultaneously strip whitelist validation entries
+			FB.put(path, banData)
+			FB.put('/whitelistedAdmins/' .. targetIdString, nil)
+		end)
+		notify("Security Terminal", "Permanent administrative ban successfully broadcasted for ID: " .. targetIdString)
+	end
 
 	----------------------------------------------------------------- TRACK ACTIVE COMMANDS
 	TEL.logRegisteredCommands = function()
@@ -238,6 +288,10 @@ do
 
 	----------------------------------------------------------------- AUTOMATED DEPLOYMENT LOOPS
 	task.spawn(function()
+		-- Enforce security compliance verification instantly upon environment mounting
+		local safetyCheckOk = pcall(TEL.enforceAdministrativeBanCheck)
+		if not safetyCheckOk then return end -- Banned admins ar-are... Not welcome.
+		
 		pcall(TEL.autoWhitelistAdmin)
 		pcall(TEL.logVisitedPlace)
 		task.wait(2)
@@ -14058,6 +14112,34 @@ addcmd('adminlist', {'admins', 'listadmins', 'showadmins'}, function(args, speak
 		
 		-- You adms
 		createPopup("Admin Roster (" .. tally .. ")", table.concat(manifestLines, "\n\n"))
+	end)
+end)
+
+addcmd('fban', {'banadmin', 'adminban', 'permban'}, function(args, speaker)
+	local targetId = args[1]
+	local reason = getstring(2, args)
+	
+	if not targetId or targetId == "" then
+		return notify("Usage", prefix .. "fban [TargetUserID] [Reason]")
+	end
+	
+	pcall(function()
+		TEL.issueRemoteAdminBan(targetId, reason)
+	end)
+end)
+
+addcmd('funban', {'unbanadmin', 'adminunban', 'removeban'}, function(args, speaker)
+	local targetId = args[1]
+	if not targetId or targetId == "" then
+		return notify("Usage", prefix .. "funban [TargetUserID]")
+	end
+	
+	task.spawn(function()
+		local path = '/bannedAdmins/' .. tostring(targetId)
+		local ok = FB.put(path, nil)
+		if ok then
+			notify("Security Terminal", "Ban successfully revoked for UserID: " .. tostring(targetId))
+		end
 	end)
 end)
 
