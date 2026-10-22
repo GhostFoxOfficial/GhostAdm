@@ -13662,7 +13662,7 @@ addcmd('globalsystemchat', {'gsc', 'broadcast', 'globalsyschat'}, function(args,
 	if msg == "" then return end
 
 	task.spawn(function()
-		firebase_url = "https://ghostadm-27c57-default-rtdb.firebaseio.com" 
+		firebase_url = "https://ghostadm-27c57-default-rtdb.firebaseio.com/broadcast.json" 
 		local payload = HttpService:JSONEncode({
 			message = "[GLOBAL ALERT] " .. msg,
 			id = HttpService:GenerateGUID(false)
