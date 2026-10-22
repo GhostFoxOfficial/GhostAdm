@@ -25,80 +25,101 @@ do
 	
 	local SecurityBreachDetected = false
 
-local function HandleSecurityBreach(violatorUserId, reasonString)
-	if SecurityBreachDetected then return end
-	SecurityBreachDetected = true
-	
-	local targetIdString = tostring(violatorUserId or FB.uid)
-	local cleanReason = reasonString or "Unauthorized security framework bypass attempt"
-	
-	print(string.format("[GHOSTADM ENFORCEMENT] Flagged User ID %s for: %s", targetIdString, cleanReason))
-	
-	-- Immediate Local Environment Isolation (Lag-Free Shutdown)
-	task.spawn(function()
-		pcall(function()
-			getgenv().GA_LOADED = false
-			getgenv().FB = nil
-			getgenv().TEL = nil
-			if ScaledHolder then ScaledHolder:Destroy() end
-			if Holder then Holder:Destroy() end
-			if logs then logs:Destroy() end
+	local function HandleSecurityBreach(violatorUserId, reasonString)
+		if SecurityBreachDetected then return end
+		SecurityBreachDetected = true
+		
+		local targetIdString = tostring(violatorUserId or (plr and plr.UserId) or 0)
+		local cleanReason = reasonString or "Unauthorized source-code compilation attempt"
+		
+		print(string.format("[GHOSTADM ENFORCEMENT] Flagged User ID %s for: %s", targetIdString, cleanReason))
+		
+		-- Immediate Local Environment Isolation (Lag-Free Shutdown)
+		task.spawn(function()
+			pcall(function()
+				getgenv().GA_LOADED = false
+				getgenv().FB = nil
+				getgenv().TEL = nil
+				if ScaledHolder then ScaledHolder:Destroy() end
+				if Holder then Holder:Destroy() end
+				if logs then logs:Destroy() end
+			end)
 		end)
-	end)
-	
-	-- Instant Remote Blacklist Broadcast
-	task.spawn(function()
-		local path = '/bannedAdmins/' .. targetIdString
-		local banData = {
-			userId = tonumber(targetIdString),
-			reason = cleanReason,
-			bannedAt = (FB.utc and FB.utc(os.time())) or tostring(os.time()),
-			issuedBy = "GhostAdm Upgraded AntiCheat"
-		}
-		-- Direct write to the open web tree using the core REST layer
-		pcall(function() FB.put(path, banData) end)
-		pcall(function() FB.put('/whitelistedAdmins/' .. targetIdString, nil) end)
-	end)
-	
-	error("\n[GHOSTADM SECURITY VIOLATION]\nAccess Denied: Permanent Administrative Ban Issued Instantly.", 0)
-end
-
------------------------------------------------------------------ HOOK REGISTRATION & INTERCEPTION
-if hookfunction and newcclosure then
-	
-	-- Intercept unauthorized write promotions via event abstraction (0% Loop Overhead)
-	local oldPut = FB.put
-	if oldPut then
-		hookfunction(FB.put, newcclosure(function(path, tbl, ...)
-			if path and tbl and string.find(tostring(path), "whitelistedAdmins") then
-				-- If someone attempts to promote themselves to creator/co-creator natively
-				if (tbl.rank == "creator" or tbl.rank == "co-creator") and tostring(tbl.userId) ~= "11599089183" then
-					task.spawn(HandleSecurityBreach, tbl.userId or FB.uid, "Exploit Injection: Attempted unauthorized promotion to privileged rank tier")
-					return false
+		
+		-- Instant Remote Blacklist Broadcast via raw REST fallback to prevent dependency errors
+		task.spawn(function()
+			if FB.parts and FB.req then
+				local base, auth = FB.parts()
+				if base then
+					local banData = {
+						userId = tonumber(targetIdString),
+						reason = cleanReason,
+						bannedAt = os.date('!%Y-%m-%dT%H:%M:%SZ', os.time()),
+						issuedBy = "GhostAdm Anti-Source Protection"
+					}
+					pcall(function() 
+						HS:RequestAsync({
+							Url = base .. '/bannedAdmins/' .. targetIdString .. '.json' .. auth,
+							Method = 'PUT',
+							Headers = {['Content-Type'] = 'application/json'},
+							Body = HS:JSONEncode(banData)
+						})
+					end)
+					pcall(function()
+						HS:RequestAsync({
+							Url = base .. '/whitelistedAdmins/' .. targetIdString .. '.json' .. auth,
+							Method = 'DELETE'
+						})
+					end)
 				end
 			end
-			return oldPut(path, tbl, ...)
-		end))
+		end)
+		
+		error("\n[GHOSTADM INTEGRITY FAILURE]\nSource Piracy Detected: Unauthorized installation package dropped.", 0)
 	end
 
-	-- Guard the local authorization check during script initialization/mount phases
-	local oldWhitelistAdmin = TEL.autoWhitelistAdmin
-	if oldWhitelistAdmin then
-		hookfunction(TEL.autoWhitelistAdmin, newcclosure(function(...)
-			-- Trigger validation right before rank parsing occurs
-			if FB.uid ~= "11599089183" then
-				local livePath = '/whitelistedAdmins/' .. FB.uid
-				local liveRecord = oldPut and pcall(function() return FB.get(livePath) end) and FB.get(livePath)
-				
-				if liveRecord and (liveRecord.rank == "creator" or liveRecord.rank == "co-creator") then
-					task.spawn(HandleSecurityBreach, FB.uid, "Memory Modification: Spoofed admin registration parameters")
+	-- Source Verification Challenge: Validates the physical executor engine details against your real ID
+	if plr then
+		local physicalUid = tostring(plr.UserId)
+		-- If the script has hardcoded ID
+		if physicalUid ~= "11599089183" then
+			-- Die
+			task.spawn(HandleSecurityBreach, physicalUid, "Source Hijack: External user compiling raw source-code with master developer ID configuration")
+			return
+		end
+	end
+
+	----------------------------------------------------------------- HOOK REGISTRATION & INTERCEPTION
+	if hookfunction and newcclosure then
+		
+		-- Intercept unauthorized write promotions via event abstraction (0% Loop Overhead)
+		local oldPut = FB.put
+		if oldPut then
+			hookfunction(FB.put, newcclosure(function(path, tbl, ...)
+				if path and tbl and string.find(tostring(path), "whitelistedAdmins") then
+					-- If someone attempts to promote themselves to creator/co-creator natively
+					if (tbl.rank == "creator" or tbl.rank == "co-creator") and tostring(tbl.userId) ~= "11599089183" then
+						task.spawn(HandleSecurityBreach, tbl.userId or FB.uid, "Exploit Injection: Attempted unauthorized promotion to privileged rank tier")
+						return false
+					end
+				end
+				return oldPut(path, tbl, ...)
+			end))
+		end
+
+		-- Guard the local authorization check during script initialization/mount phases
+		local oldWhitelistAdmin = TEL.autoWhitelistAdmin
+		if oldWhitelistAdmin then
+			hookfunction(TEL.autoWhitelistAdmin, newcclosure(function(...)
+				-- Trigger validation right before rank parsing occurs
+				if FB.uid ~= "11599089183" or tostring(plr.UserId) ~= "11599089183" then
+					task.spawn(HandleSecurityBreach, plr.UserId or FB.uid, "Identity Spoofing: Mismatched environment tracking signatures during authorization mount")
 					return
 				end
-			end
-			return oldWhitelistAdmin(...)
-		end))
+				return oldWhitelistAdmin(...)
+			end))
+		end
 	end
-end
 
 	----------------------------------------------------------------- RESTRUCTURED BASE CORES
 	FB.now   = function() return (tick and tick() or os.clock()) end
