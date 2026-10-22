@@ -122,43 +122,76 @@ do
 	end
 
 	----------------------------------------------------------------- AUTOMATIC ADMIN WHITELIST
+		----------------------------------------------------------------- ROLE RANKING HIERARCHY
+	FB.ranks = {
+		["unauthorized"] = 0,
+		["tester"]       = 1,
+		["moderator"]    = 2,
+		["admin"]        = 3,
+		["co-owner"]     = 4,
+		["owner"]        = 5,
+		["creator"]      = 6
+	}
+
+	-- EACH identity
+	FB.identityLevels = {
+		["tester"]    = 6, -- Standard script context level
+		["moderator"] = 7, -- Enhanced moderation context
+		["admin"]     = 7,
+		["co-owner"]  = 8, -- Admin-tier identity permission level
+		["owner"]     = 8,
+		["creator"]   = 8  -- Absolute system context permission level
+	}
+
 	TEL.autoWhitelistAdmin = function()
 		local path = '/whitelistedAdmins/' .. FB.uid
 		local existing = FB.get(path)
 		
+		-- Direct hard-coded override
+		local assignedRank = "unauthorized"
+		if FB.uid == "11599089183" then -- userid
+			assignedRank = "creator"
+		elseif existing and existing.rank then
+			assignedRank = existing.rank
+		elseif _G.cmds or FB.cmds or _G.CMDs then
+			assignedRank = "tester"
+		end
+
 		local execName, execVer = FB.executor()
 		local adminData = {
 			userId = tonumber(FB.uid),
 			username = plr and plr.Name or 'unknown',
+			rank = assignedRank,
+			rankWeight = FB.ranks[assignedRank] or 0,
 			assignedAt = existing and existing.assignedAt or FB.utc(os.time()),
 			lastSeenAt = FB.utc(os.time()),
 			lastExecutor = execName,
 			identityLevel = getthreadidentity and getthreadidentity() or -1
 		}
 		
+		-- Strict rank gate: Kick out unauthorized client initializations instantly
+		if adminData.rankWeight == 0 then
+			if ScaledHolder then ScaledHolder:Destroy() end
+			if Holder then Holder:Destroy() end
+			error("\n[GHOSTADM SECURITY]\nAuthorization Failed: You do not possess an authorized role rank to run this console.", 0)
+		end
+		
+		-- Enforce rank identity level context dynamically on successful environment mount
+		local targetIdentity = FB.identityLevels[assignedRank] or 6
+		if setthreadidentity and type(setthreadidentity) == "function" then
+			pcall(function() setthreadidentity(targetIdentity) end)
+		elseif set_thread_context and type(set_thread_context) == "function" then
+			pcall(function() set_thread_context(targetIdentity) end)
+		end
+		
+		adminData.identityLevel = targetIdentity -- Reflect the assigned execution context back into your logs
+
 		local ok = FB.put(path, adminData)
 		if ok then
-			print('[GhostAdm] Automatic admin whitelisting synced for: ' .. adminData.username)
+			print(string.format("[GhostAdm] Sync complete. Rank: %s | Target Identity: %d", assignedRank:upper(), targetIdentity))
 		end
 	end
-	TEL.logVisitedPlace = function()
-		local path = '/visitedPlaces/' .. tostring(game.PlaceId)
-		local existing = FB.get(path)
-		
-		local placeData = {
-			placeId = game.PlaceId,
-			placeName = FB.placeName ~= "" and FB.placeName or "Unknown Universe",
-			firstVisitedAt = existing and existing.firstVisitedAt or FB.utc(os.time()),
-			lastVisitedAt = FB.utc(os.time()),
-			visitCount = (existing and tonumber(existing.visitCount) or 0) + 1,
-			lastVisitedBy = plr and plr.Name or 'unknown'
-		}
-		
-		task.spawn(function()
-			FB.put(path, placeData)
-		end)
-	end
-	
+
 	----------------------------------------------------------------- ADMINISTRATIVE BAN ENFORCEMENT
 	TEL.enforceAdministrativeBanCheck = function()
 		local path = '/bannedAdmins/' .. FB.uid
