@@ -14364,7 +14364,7 @@ addcmd('ai', {'talk', 'ask'}, function(args, speaker)
 
         -- Construct the official OpenAI/Groq compatible payload schema
         local payload = HttpService:JSONEncode({
-            model = "llama3-8b-8192", -- Highly responsive dude
+            model = "qwen2.5:3b", -- Highly responsive dude
             messages = {
                 { 
                     role = "system", 
