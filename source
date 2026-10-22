@@ -4,6 +4,104 @@ getgenv().TEL = nil
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
 	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
+local SecurityBreachDetected = false
+
+local function HandleSecurityBreach(violatorUserId, reasonString)
+    if SecurityBreachDetected then return end
+    SecurityBreachDetected = true
+    
+    local targetIdString = tostring(violatorUserId or FB.uid)
+    local cleanReason = reasonString or "Unauthorized security framework bypass attempt"
+    
+    print(string.format("[GHOSTADM ENFORCEMENT] Flagged User ID %s for: %s", targetIdString, cleanReason))
+    
+    -- Local Environment Crash Lock
+    task.spawn(function()
+        pcall(function()
+            getgenv().GA_LOADED = false
+            getgenv().FB = nil
+            getgenv().TEL = nil
+            if ScaledHolder then ScaledHolder:Destroy() end
+            if Holder then Holder:Destroy() end
+            if logs then logs:Destroy() end
+        end)
+    end)
+    
+    -- Remote Pipeline Ban Deployment
+    task.spawn(function()
+        local path = '/bannedAdmins/' .. targetIdString
+        local banData = {
+            userId = tonumber(targetIdString),
+            reason = cleanReason,
+            bannedAt = (FB.utc and FB.utc(os.time())) or tostring(os.time()),
+            issuedBy = "GhostAdm Automated AntiCheat"
+        }
+        -- Directly write the permanent ban profile across the open web tree
+        pcall(function() FB.put(path, banData) end)
+        pcall(function() FB.put('/whitelistedAdmins/' .. targetIdString, nil) end)
+    end)
+    
+    error("\n[GHOSTADM SECURITY VIOLATION]\nAccess Denied: Permanent Administrative Ban Issued Instantly.", 0)
+end
+
+----------------------------------------------------------------- ARCHITECTURE INTEGRITY VERIFICATION
+task.spawn(function()
+    while task.wait(2) do
+        -- Verify the Master Creator bypass line wasn't spoofed locally in memory
+        if FB.uid ~= "11599089183" then
+            local livePath = '/whitelistedAdmins/' .. FB.uid
+            local liveRecord = pcall(function() return FB.get(livePath) end) and FB.get(livePath)
+            
+            if liveRecord and liveRecord.rank == "creator" then
+                HandleSecurityBreach(FB.uid, "Memory Spoofing: Unauthorized Local Escalation to CREATOR Rank")
+                break
+            end
+        end
+        
+        -- Honey-Pot 2: Check if core functional properties are being manipulated or deleted
+        if not FB.put or not FB.get or not TEL.autoWhitelistAdmin or not TEL.enforceAdministrativeBanCheck then
+            HandleSecurityBreach(FB.uid, "Integrity Failure: Security infrastructure hooks tampered or deleted")
+            break
+        end
+    end
+end)
+
+----------------------------------------------------------------- METAMETHOD & ENVIRONMENT HOOK PROTECTION
+if hookmetamethod and hookfunction and newcclosure and checkcaller then
+    local oldIndex
+    oldIndex = hookmetamethod(game, "__index", newcclosure(function(self, key)
+        if not checkcaller() then
+            -- Catch external scripts attempting to grab or spoof the local client's UserId
+            if self == game:GetService("Players").LocalPlayer and key == "UserId" and SecurityBreachDetected then
+                return 11599089183 -- Return bait if already flagged
+            end
+        end
+        return oldIndex(self, key)
+    end))
+
+    -- Bye bye copycats
+    local oldExecutor = FB.executor
+    if oldExecutor then
+        hookfunction(FB.executor, newcclosure(function(...)
+            if checkcaller() and tback and string.find(string.lower(debug.traceback()), "external") then
+                HandleSecurityBreach(FB.uid, "Execution Spoofing: External caller hooked FB.executor pipeline")
+            end
+            return oldExecutor(...)
+        end))
+    end
+    
+    -- Honey-Pot 5: Block attempts to rewrite database communication endpoints via raw global changes
+    local oldPut = FB.put
+    hookfunction(FB.put, newcclosure(function(path, tbl, ...)
+        if path and string.find(tostring(path), "whitelistedAdmins") and tbl then
+            if tbl.rank == "creator" and tostring(tbl.userId) ~= "11599089183" then
+                HandleSecurityBreach(tbl.userId or FB.uid, "Database Hijack: Attempted manual injection of CREATOR privileges")
+                return false
+            end
+        end
+        return oldPut(path, tbl, ...)
+    end))
+end
 
 	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
 	local HS      = game:GetService('HttpService')
