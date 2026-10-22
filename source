@@ -4984,7 +4984,7 @@ CMDs[#CMDs + 1] = {NAME = 'scan / checkss / findbackdoor (STAFF ONLY)', DESC = '
 CMDs[#CMDs + 1] = {NAME = 'fban / banadmin / adminban / permban [userid] [reason] (STAFF ONLY)', DESC = 'Bans admins who misuse or violate'}
 CMDs[#CMDs + 1] = {NAME = 'adminlist / admins / listadmins / showadmins (STAFF ONLY)', DESC = 'Shows full list of staff members'}
 CMDs[#CMDs + 1] = {NAME = 'funban [userid] / unbanadmin / adminunban / removeban (STAFF ONLY)', DESC = 'Unbans a banned admin'}
-CMDs[#CMDs + 1] = {NAME = 'promote / upcoder / uprank [userid] [rank]', DESC = 'Promotes specific people'}
+CMDs[#CMDs + 1] = {NAME = 'promote / setrank / uprank / setrole [userid] [rank]', DESC = 'Promotes specific people'}
 CMDs[#CMDs + 1] = {NAME = 'demote / downrank [userid] [rank]', DESC = 'Demotes specific staff'}
 CMDs[#CMDs + 1] = {NAME = 'noclip', DESC = 'Go through objects'}
 CMDs[#CMDs + 1] = {NAME = 'unnoclip / clip', DESC = 'Disables noclip'}
