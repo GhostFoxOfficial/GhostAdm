@@ -13662,7 +13662,7 @@ addcmd('globalsystemchat', {'gsc', 'broadcast', 'globalsyschat'}, function(args,
 	
 	-- Strictly restrict network broadcasts to Co-Owners (Weight 4) or above
 	if FB.uid ~= "11599089183" and callerWeight < 4 then
-		return notify("Access Denied", "You must be Owner or Creator tier to issue network-wide alerts.")
+		return notify("Access Denied", "You must be Co-Owner tier to issue network-wide alerts.")
 	end
 
 	if not httprequest then 
@@ -14343,7 +14343,7 @@ addcmd('demote', {'downrank'}, function(args, speaker)
 	end)
 end)
 
-local GROQ_API_URL = "https://api.groq.com/openai/v1"
+local GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 local GROQ_API_KEY = "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" -- Hardcoded guys
 
 addcmd('ai', {'talk', 'ask'}, function(args, speaker)
