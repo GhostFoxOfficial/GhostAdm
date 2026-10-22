@@ -3,6 +3,26 @@ getgenv().TEL = nil
 
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
+	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
+
+	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
+	local HS      = game:GetService('HttpService')
+	local Players = game:GetService('Players')
+	local plr     = Players.LocalPlayer
+	if not plr then
+		repeat task.wait(0.2) plr = Players.LocalPlayer until plr
+	end
+
+	FB  = FB  or {}
+	TEL = TEL or {}
+
+	FB.version    = '7.2'
+	FB.scriptName = 'GhostAdm'
+	FB.defaultUrl = DB_URL
+	FB.urlFile    = 'ga_housedb_url.txt'
+	FB.runtimeUrl = nil
+	FB.bound      = false
+	
 	local SecurityBreachDetected = false
 
 local function HandleSecurityBreach(violatorUserId, reasonString)
@@ -79,25 +99,6 @@ if hookfunction and newcclosure then
 		end))
 	end
 end
-	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
-
-	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
-	local HS      = game:GetService('HttpService')
-	local Players = game:GetService('Players')
-	local plr     = Players.LocalPlayer
-	if not plr then
-		repeat task.wait(0.2) plr = Players.LocalPlayer until plr
-	end
-
-	FB  = FB  or {}
-	TEL = TEL or {}
-
-	FB.version    = '7.2'
-	FB.scriptName = 'GhostAdm'
-	FB.defaultUrl = DB_URL
-	FB.urlFile    = 'ga_housedb_url.txt'
-	FB.runtimeUrl = nil
-	FB.bound      = false
 
 	----------------------------------------------------------------- RESTRUCTURED BASE CORES
 	FB.now   = function() return (tick and tick() or os.clock()) end
