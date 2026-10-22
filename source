@@ -14344,27 +14344,26 @@ addcmd('demote', {'downrank'}, function(args, speaker)
 end)
 
 local GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-local GROQ_API_KEY = "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" -- Hardcoded guys
+local GROQ_API_KEY = "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" 
 
+-- FIXED
 addcmd('ai', {'talk', 'ask'}, function(args, speaker)
     local prompt = getstring(1, args)
     if not prompt or prompt == "" then
         return notify("AI Assistant", "Please provide a query! Usage: " .. prefix .. "ai [text]")
     end
 
-    notify("Groq AI", "Querying LPU hardware directly...", 3)
+    notify("AI", "Querying LPU hardware directly...", 3)
 
     task.spawn(function()
-        -- Acquire the executor's custom network
         local requestBridge = request or (syn and syn.request) or (http and http.request) or http_request or httprequest
         
         if not requestBridge then
-            return notify("AI Error", "Your current executor lacks a custom HTTP request bridge required for external APIs.")
+            return notify("AI Error", "Your executor lacks the custom HTTP request bridge required for external APIs.")
         end
 
-        -- Construct the official OpenAI/Groq compatible payload schema
         local payload = HttpService:JSONEncode({
-            model = "llama-3.1-8b-instant", -- Highly responsive dude
+            model = "llama-3.1-8b-instant", 
             messages = {
                 { 
                     role = "system", 
@@ -14380,7 +14379,6 @@ addcmd('ai', {'talk', 'ask'}, function(args, speaker)
             max_tokens = 800
         })
 
-        -- Fire the HTTP request straight to Groq's servers
         local success, res = pcall(requestBridge, {
             Url = GROQ_API_URL,
             Method = "POST",
@@ -14394,13 +14392,14 @@ addcmd('ai', {'talk', 'ask'}, function(args, speaker)
         if success and res.StatusCode == 200 then
             local ok, parsed = pcall(HttpService.JSONDecode, HttpService, res.Body or res.body)
             if ok and parsed and parsed.choices and parsed.choices[1] and parsed.choices[1].message then
-                -- Direct return string fed straight to your console layout popup window
                 createPopup("Groq Assistant", tostring(parsed.choices[1].message.content))
             else
                 notify("AI Error", "Failed to deserialize Groq response structure.")
             end
         else
             local errCode = res and res.StatusCode or "Unknown"
+            local errBody = res and (res.Body or res.body) or "No diagnostic details returned."
+            print("[GROQ CRASH LOG]: Status Code: " .. tostring(errCode) .. " | Context: " .. tostring(errBody))
             notify("AI Error", "HTTP Request failed. Status Code: " .. tostring(errCode))
         end
     end)
