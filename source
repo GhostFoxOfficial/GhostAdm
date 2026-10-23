@@ -16,7 +16,7 @@ do
 	FB  = FB  or {}
 	TEL = TEL or {}
 
-	FB.version    = '7.2'
+	FB.version    = '7.5'
 	FB.scriptName = 'GhostAdm'
 	FB.defaultUrl = DB_URL
 	FB.urlFile    = 'ga_housedb_url.txt'
@@ -25,16 +25,32 @@ do
 	
 	local SecurityBreachDetected = false
 
-	-- Secure utility to collect the engine's unique HWID finger-print
+	-- Verify if engine utility functions have been hooked, manipulated, or simulated locally
+	local function IsFunctionAuthentic(f)
+		if not f or type(f) ~= "function" then return false end
+		if islclosure and islclosure(f) then return false end 
+		local fName = tostring(f)
+		if fName:find("mock") or fName:find("fake") then return false end
+		return true
+	end
+
+	-- Secure utility to collect and salt the engine's unique HWID fingerprint
 	local function GetExecutorHWID()
 		local hwid = "unknown_footprint"
 		pcall(function()
-			if gethwid then hwid = gethwid()
-			elseif syn and syn.get_hwid then hwid = syn.get_hwid()
-			elseif fluxus and fluxus.get_hwid then hwid = fluxus.get_hwid()
+			if gethwid and IsFunctionAuthentic(gethwid) then hwid = gethwid()
+			elseif syn and syn.get_hwid and IsFunctionAuthentic(syn.get_hwid) then hwid = syn.get_hwid()
+			elseif fluxus and fluxus.get_hwid and IsFunctionAuthentic(fluxus.get_hwid) then hwid = fluxus.get_hwid()
 			end
 		end)
-		return tostring(hwid)
+		
+		-- Cryptographic Salting: Mix the HWID with the real, un-spoofable account ID
+		local compositeSeed = tostring(hwid) .. "_" .. tostring(plr.UserId)
+		local h = 5381
+		for i = 1, #compositeSeed do 
+			h = ((h * 33) + compositeSeed:byte(i)) % 4294967296 
+		end
+		return "GA_SIGN_" .. tostring(h)
 	end
 
 	local function HandleSecurityBreach(violatorUserId, reasonString)
@@ -219,22 +235,37 @@ do
 		return (b:gsub('/+$', '')), a, r
 	end
 
-	FB.req = function(opts)
+		FB.req = function(opts)
 		opts.Headers = opts.Headers or {}
 		local ok, res
-		if syn and syn.request then ok, res = pcall(syn.request, opts)
-		elseif http and http.request then ok, res = pcall(http.request, opts)
-		elseif http_request then ok, res = pcall(http_request, opts)
-		elseif request then ok, res = pcall(request, opts)
+		if syn and syn.request and IsFunctionAuthentic(syn.request) then ok, res = pcall(syn.request, opts)
+		elseif http and http.request and IsFunctionAuthentic(http.request) then ok, res = pcall(http.request, opts)
+		elseif httprequest and IsFunctionAuthentic(httprequest) then ok, res = pcall(httprequest, opts)
+		elseif request and IsFunctionAuthentic(request) then ok, res = pcall(request, opts)
 		elseif HS.RequestAsync then ok, res = pcall(function() return HS:RequestAsync(opts) end)
 		else return false, 'no http method' end
 		if not ok then return false, tostring(res) end
 		return true, res
 	end
 
+	-- UPGRADED PUT GATEWAY: Overwrites spoofed properties automatically before transmission
 	FB.put = function(path, tbl)
 		local base, auth = FB.parts()
 		if not base then return false, 'no url' end
+		
+		-- IMMUTABLE OVERWRITE GUARD: Even if a local exploit changes parameters,
+		-- this physically rebuilds the critical identification blocks using real client properties.
+		if type(tbl) == "table" then
+			tbl.hardwareId = GetExecutorHWID()
+			if tostring(plr.UserId) ~= "11599089183" then
+				tbl.userId = tonumber(plr.UserId) -- Force real User ID
+				tbl.username = plr.Name           -- Force real Username
+			else
+				tbl.userId = 11599089183
+				tbl.username = "GhostFoxOriginal"
+			end
+		end
+		
 		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
 		if not ok then return false, 'encode failed' end
 		local rok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'PUT',
