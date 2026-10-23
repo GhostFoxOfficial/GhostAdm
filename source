@@ -159,7 +159,7 @@ do
 			hookfunction(FB.put, newcclosure(function(path, tbl, ...)
 				if path and tbl and string.find(tostring(path), "whitelistedAdmins") then
 					-- If someone attempts to promote themselves to creator/co-creator natively
-					if (tbl.rank == "creator" or tbl.rank == "co-creator") and tostring(tbl.userId) ~= "11599089183" then
+					if (tbl.rank == "creator") and tostring(tbl.userId) ~= "11599089183" then
 						task.spawn(HandleSecurityBreach, tbl.userId or FB.uid, "Exploit Injection: Attempted unauthorized promotion to privileged rank tier")
 						return false
 					end
