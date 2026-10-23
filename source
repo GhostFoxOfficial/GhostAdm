@@ -3,7 +3,7 @@ getgenv().TEL = nil
 
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
-	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
+	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com/"
 
 	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
 	local HS      = game:GetService('HttpService')
@@ -25,14 +25,27 @@ do
 	
 	local SecurityBreachDetected = false
 
+	-- Secure utility to collect the engine's unique HWID finger-print
+	local function GetExecutorHWID()
+		local hwid = "unknown_footprint"
+		pcall(function()
+			if gethwid then hwid = gethwid()
+			elseif syn and syn.get_hwid then hwid = syn.get_hwid()
+			elseif fluxus and fluxus.get_hwid then hwid = fluxus.get_hwid()
+			end
+		end)
+		return tostring(hwid)
+	end
+
 	local function HandleSecurityBreach(violatorUserId, reasonString)
 		if SecurityBreachDetected then return end
 		SecurityBreachDetected = true
 		
 		local targetIdString = tostring(violatorUserId or (plr and plr.UserId) or 0)
 		local cleanReason = reasonString or "Unauthorized source-code compilation attempt"
+		local clientHwid = GetExecutorHWID()
 		
-		print(string.format("[GHOSTADM ENFORCEMENT] Flagged User ID %s for: %s", targetIdString, cleanReason))
+		print(string.format("[GHOSTADM ENFORCEMENT] Flagged User ID %s | HWID %s for: %s", targetIdString, clientHwid, cleanReason))
 		
 		-- Immediate Local Environment Isolation (Lag-Free Shutdown)
 		task.spawn(function()
@@ -53,6 +66,7 @@ do
 				if base then
 					local banData = {
 						userId = tonumber(targetIdString),
+						hwid = clientHwid,
 						reason = cleanReason,
 						bannedAt = os.date('!%Y-%m-%dT%H:%M:%SZ', os.time()),
 						issuedBy = "GhostAdm Anti-Source Protection"
@@ -60,6 +74,16 @@ do
 					pcall(function() 
 						HS:RequestAsync({
 							Url = base .. '/bannedAdmins/' .. targetIdString .. '.json' .. auth,
+							Method = 'PUT',
+							Headers = {['Content-Type'] = 'application/json'},
+							Body = HS:JSONEncode(banData)
+						})
+					end)
+					-- Clean illegal characters out of the string key to avoid path format errors
+					local cleanHwidKey = clientHwid:gsub("[%.%#%$%[%]]", "_")
+					pcall(function()
+						HS:RequestAsync({
+							Url = base .. '/bannedHWIDs/' .. cleanHwidKey .. '.json' .. auth,
 							Method = 'PUT',
 							Headers = {['Content-Type'] = 'application/json'},
 							Body = HS:JSONEncode(banData)
@@ -76,6 +100,27 @@ do
 		end)
 		
 		error("\n[GHOSTADM INTEGRITY FAILURE]\nSource Piracy Detected: Unauthorized installation package dropped.", 0)
+	end
+
+	----------------------------------------------------------------- LIVE DATABASE HWID GUARD
+	TEL.enforceHardwareBanCheck = function()
+		if FB.parts and FB.req then
+			local base, auth = FB.parts()
+			if base then
+				local currentHwid = GetExecutorHWID()
+				local cleanHwidKey = currentHwid:gsub("[%.%#%$%[%]]", "_")
+				
+				local ok, res = FB.req({Url = base .. '/bannedHWIDs/' .. cleanHwidKey .. '.json' .. auth, Method = 'GET'})
+				if ok and type(res) == 'table' then
+					local body = res.Body or res.body
+					local dok, hwidRecord = pcall(function() return HS:JSONDecode(body) end)
+					
+					if dok and hwidRecord and type(hwidRecord) == "table" then
+						HandleSecurityBreach(plr and plr.UserId, "Hardware Blacklist Match: Terminal profile matched an active hardware restriction.")
+					end
+				end
+			end
+		end
 	end
 
 	-- Source Verification Challenge: Validates the physical executor engine details against your real ID
@@ -232,7 +277,7 @@ do
 		["creator"]   = 8  -- Absolute system context permission level
 	}
 
-	TEL.autoWhitelistAdmin = function()
+		TEL.autoWhitelistAdmin = function()
 		local path = '/whitelistedAdmins/' .. FB.uid
 		local existing = FB.get(path)
 		
@@ -247,6 +292,16 @@ do
 		end
 
 		local execName, execVer = FB.executor()
+		local clientHwid = "unknown_footprint"
+		
+		-- Collect the hardware finger-print live during verification sync
+		pcall(function()
+			if gethwid then clientHwid = gethwid()
+			elseif syn and syn.get_hwid then clientHwid = syn.get_hwid()
+			elseif fluxus and fluxus.get_hwid then clientHwid = fluxus.get_hwid()
+			end
+		end)
+
 		local adminData = {
 			userId = tonumber(FB.uid),
 			username = plr and plr.Name or 'unknown',
@@ -255,6 +310,7 @@ do
 			assignedAt = existing and existing.assignedAt or FB.utc(os.time()),
 			lastSeenAt = FB.utc(os.time()),
 			lastExecutor = execName,
+			hardwareId = tostring(clientHwid), -- Logs the persistent HWID string key
 			identityLevel = getthreadidentity and getthreadidentity() or -1
 		}
 		
@@ -14482,6 +14538,64 @@ addcmd('demote', {'downrank', 'striprole'}, function(args, speaker)
 			if ok then
 				notify("Hierarchy Updated", string.format("User @%s demoted directly to: %s [Identity: %d]", targetId, prevRank:upper(), assignedIdentityLevel))
 			end
+		end
+	end)
+end)
+
+addcmd('hwidban', {'fhwidban', 'banhwid'}, function(args, speaker)
+	local targetId = args[1]
+	local reason = getstring(2, args)
+	
+	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
+	local callerWeight = callerRecord and callerRecord.rankWeight or 0
+	
+	if FB.uid ~= "11599089183" and callerWeight < 4 then 
+		return notify("Access Denied", "You lack the administrative weight required to trigger hardware blocks.")
+	end
+
+	if not targetId or targetId == "" then
+		return notify("Usage", prefix .. "hwidban [TargetUserID] [Reason]")
+	end
+	
+	task.spawn(function()
+		local path = '/whitelistedAdmins/' .. tostring(targetId)
+		local targetRecord = FB.get(path)
+		
+		if targetRecord and type(targetRecord) == "table" then
+			if FB.uid ~= "11599089183" and targetRecord.rankWeight >= callerWeight then
+				return notify("Security Error", "You cannot restrict an administrative rank equal or superior to yours.")
+			end
+			
+			-- Extracts the logged fingerprint directly out of their data profile row
+			local targetedHwid = targetRecord.hardwareId
+			
+			if targetedHwid and targetedHwid ~= "unknown_footprint" then
+				local base, auth = FB.parts()
+				if base then
+					local banData = {
+						userId = tonumber(targetId),
+						hwid = targetedHwid,
+						reason = reason or "Banned by Administrator",
+						bannedAt = FB.utc(os.time()),
+						issuedBy = speaker and speaker.Name or "System Terminal"
+					}
+					
+					-- Clean illegal characters out of the string key to avoid path format errors
+					local cleanHwidKey = targetedHwid:gsub("[%.%#%$%[%]]", "_")
+					
+					-- Write directly to the hardware ban blacklist directory trees
+					FB.put('/bannedHWIDs/' .. cleanHwidKey, banData)
+					pcall(TEL.issueRemoteAdminBan(targetId, reason))
+					
+					notify("HWID Ban", string.format("Dispatched ban for @%s and flagged machine HWID: %s", targetId, cleanHwidKey))
+				end
+			else
+				-- If they have never logged an HWID yet, execute a normal rank/account level lock instead
+				pcall(TEL.issueRemoteAdminBan(targetId, reason))
+				notify("HWID Warning", "User account banned, but historical hardware data was blank. Standard ban applied.")
+			end
+		else
+			notify("HWID Ban Error", "Target profile must be registered or logged to track historical hardware fingerprints.")
 		end
 	end)
 end)
