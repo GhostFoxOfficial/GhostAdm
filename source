@@ -5,7 +5,7 @@ do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
 	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com/"
 	-- Appended the necessary endpoint layout structure path cleanly
-	local PROXY_GATEWAY_URL = "https://ghostyurlblock.onrender.com/api/gateaway/"
+	local PROXY_GATEWAY_URL = "https://ghostyurlblock.onrender.com/api/gateway/"
 
 	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
 	local HS      = game:GetService('HttpService')
