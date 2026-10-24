@@ -3,7 +3,7 @@ getgenv().TEL = nil
 
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
-	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com/"
+	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
 
 	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
 	local HS      = game:GetService('HttpService')
@@ -227,53 +227,33 @@ do
 		pcall(function() writefile(FB.urlFile, u) end)
 		return u
 	end
-	FB.parts = function()
-		local r = FB.readUrl()
-		if r == '' then return nil, '', '' end
-		local b, a = r:match('^(.-)(%?auth=.*)$')
-		if not b then b, a = r, '' end
-		return (b:gsub('/+$', '')), a, r
-	end
+	
+	local PROXY_GATEWAY_URL = "https://ghostyurlblock.onrender.com"
 
-		FB.req = function(opts)
-		opts.Headers = opts.Headers or {}
-		local ok, res
-		if syn and syn.request and IsFunctionAuthentic(syn.request) then ok, res = pcall(syn.request, opts)
-		elseif http and http.request and IsFunctionAuthentic(http.request) then ok, res = pcall(http.request, opts)
-		elseif httprequest and IsFunctionAuthentic(httprequest) then ok, res = pcall(httprequest, opts)
-		elseif request and IsFunctionAuthentic(request) then ok, res = pcall(request, opts)
-		elseif HS.RequestAsync then ok, res = pcall(function() return HS:RequestAsync(opts) end)
-		else return false, 'no http method' end
-		if not ok then return false, tostring(res) end
-		return true, res
-	end
+FB.parts = function()
+    local _, _, fullRuntimeUrl = (PROXY_GATEWAY_URL):match('^(.-)(%?auth=.*)$')
+    fullRuntimeUrl = FB.readUrl()
+    return PROXY_GATEWAY_URL, "", fullRuntimeUrl
+end
 
-	-- Overwrites spoofed properties automatically before transmission
-	FB.put = function(path, tbl)
-		local base, auth = FB.parts()
-		if not base then return false, 'no url' end
-		
-		-- Even if a local exploit changes parameters,
-		-- this physically rebuilds the critical identification blocks using real client properties.
-		if type(tbl) == "table" then
-			tbl.hardwareId = GetExecutorHWID()
-			if tostring(plr.UserId) ~= "11599089183" then
-				tbl.userId = tonumber(plr.UserId) -- Force real User ID
-				tbl.username = plr.Name           -- Force real Username
-			else
-				tbl.userId = 11599089183
-				tbl.username = "GhostFoxOriginal"
-			end
-		end
-		
-		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
-		if not ok then return false, 'encode failed' end
-		local rok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'PUT',
-			Body = body, Headers = {['Content-Type'] = 'application/json'}})
-		return rok
-	end
+FB.req = function(opts)
+    opts.Headers = opts.Headers or {}
+    local _, _, fullRuntimeUrl = FB.parts()
+    opts.Headers["x-runtime-url"] = fullRuntimeUrl
+    opts.Url = opts.Url:gsub("%.json", "")
 
-	FB.get = function(path)
+    local ok, res
+    if syn and syn.request and IsFunctionAuthentic(syn.request) then ok, res = pcall(syn.request, opts)
+    elseif http and http.request and IsFunctionAuthentic(http.request) then ok, res = pcall(http.request, opts)
+    elseif httprequest and IsFunctionAuthentic(httprequest) then ok, res = pcall(httprequest, opts)
+    elseif request and IsFunctionAuthentic(request) then ok, res = pcall(request, opts)
+    elseif HS.RequestAsync then ok, res = pcall(function() return HS:RequestAsync(opts) end)
+    else return false, 'no http method' end
+    
+    if not ok then return false, tostring(res) end
+    return true, res
+end
+
 		local base, auth = FB.parts()
 		if not base then return nil end
 		local ok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'GET'})
