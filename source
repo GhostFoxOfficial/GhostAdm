@@ -196,6 +196,12 @@ do
 		for i = 1, #s do h = ((h * 33) + s:byte(i)) % 4294967296 end
 		return h
 	end
+	FB.hash = function(s)
+		local h = 5381
+		s = tostring(s or '')
+		for i = 1, #s do h = ((h * 33) + s:byte(i)) % 4294967296 end
+		return h
+	end
 	FB.notify = function(title, text, dur)
 		if type(FB.notifyFn) == 'function' then
 			pcall(FB.notifyFn, title, text, dur or 6)
@@ -230,30 +236,50 @@ do
 	
 	local PROXY_GATEWAY_URL = "https://ghostyurlblock.onrender.com"
 
-FB.parts = function()
-    local _, _, fullRuntimeUrl = (PROXY_GATEWAY_URL):match('^(.-)(%?auth=.*)$')
-    fullRuntimeUrl = FB.readUrl()
-    return PROXY_GATEWAY_URL, "", fullRuntimeUrl
-end
+	FB.parts = function()
+		local _, _, fullRuntimeUrl = (PROXY_GATEWAY_URL):match('^(.-)(%?auth=.*)$')
+		fullRuntimeUrl = FB.readUrl()
+		return PROXY_GATEWAY_URL, "", fullRuntimeUrl
+	end
 
-FB.req = function(opts)
-    opts.Headers = opts.Headers or {}
-    local _, _, fullRuntimeUrl = FB.parts()
-    opts.Headers["x-runtime-url"] = fullRuntimeUrl
-    opts.Url = opts.Url:gsub("%.json", "")
+	FB.req = function(opts)
+		opts.Headers = opts.Headers or {}
+		local _, _, fullRuntimeUrl = FB.parts()
+		opts.Headers["x-runtime-url"] = fullRuntimeUrl
+		opts.Url = opts.Url:gsub("%.json", "")
 
-    local ok, res
-    if syn and syn.request and IsFunctionAuthentic(syn.request) then ok, res = pcall(syn.request, opts)
-    elseif http and http.request and IsFunctionAuthentic(http.request) then ok, res = pcall(http.request, opts)
-    elseif httprequest and IsFunctionAuthentic(httprequest) then ok, res = pcall(httprequest, opts)
-    elseif request and IsFunctionAuthentic(request) then ok, res = pcall(request, opts)
-    elseif HS.RequestAsync then ok, res = pcall(function() return HS:RequestAsync(opts) end)
-    else return false, 'no http method' end
-    
-    if not ok then return false, tostring(res) end
-    return true, res
-end
+		local ok, res
+		if syn and syn.request and IsFunctionAuthentic(syn.request) then ok, res = pcall(syn.request, opts)
+		elseif http and http.request and IsFunctionAuthentic(http.request) then ok, res = pcall(http.request, opts)
+		elseif httprequest and IsFunctionAuthentic(httprequest) then ok, res = pcall(httprequest, opts)
+		elseif request and IsFunctionAuthentic(request) then ok, res = pcall(request, opts)
+		elseif HS.RequestAsync then ok, res = pcall(function() return HS:RequestAsync(opts) end)
+		else return false, 'no http method' end
+		
+		if not ok then return false, tostring(res) end
+		return true, res
+	end
 
+	FB.put = function(path, tbl)
+		local base, auth = FB.parts()
+		if not base then return false, 'no url' end
+		if type(tbl) == "table" then
+			tbl.hardwareId = GetExecutorHWID()
+			if tostring(plr.UserId) ~= "11599089183" then
+				tbl.userId = tonumber(plr.UserId)
+				tbl.username = plr.Name
+			else
+				tbl.userId = 11599089183
+				tbl.username = "GhostFoxOriginal"
+			end
+		end
+		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
+		if not ok then return false, 'encode failed' end
+		local rok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'PUT', Body = body, Headers = {['Content-Type'] = 'application/json'}})
+		return rok
+	end
+
+	FB.get = function(path)
 		local base, auth = FB.parts()
 		if not base then return nil end
 		local ok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'GET'})
