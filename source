@@ -25,7 +25,7 @@ do
 	
 	local SecurityBreachDetected = false
 
-	-- Verify if engine utility functions have been hooked, manipulated, or simulated locally
+	-- Can't hack anymore
 	local function IsFunctionAuthentic(f)
 		if not f or type(f) ~= "function" then return false end
 		if islclosure and islclosure(f) then return false end 
@@ -34,7 +34,7 @@ do
 		return true
 	end
 
-	-- Secure utility to collect and salt the engine's unique HWID fingerprint
+	-- Collecting HWIDs
 	local function GetExecutorHWID()
 		local hwid = "unknown_footprint"
 		pcall(function()
@@ -44,7 +44,7 @@ do
 			end
 		end)
 		
-		-- Cryptographic Salting: Mix the HWID with the real, un-spoofable account ID
+		-- Mixing
 		local compositeSeed = tostring(hwid) .. "_" .. tostring(plr.UserId)
 		local h = 5381
 		for i = 1, #compositeSeed do 
@@ -63,7 +63,7 @@ do
 		
 		print(string.format("[GHOSTADM ENFORCEMENT] Flagged User ID %s | HWID %s for: %s", targetIdString, clientHwid, cleanReason))
 		
-		-- Immediate Local Environment Isolation (Lag-Free Shutdown)
+		-- Immediate isolation
 		task.spawn(function()
 			pcall(function()
 				getgenv().GA_LOADED = false
@@ -75,7 +75,7 @@ do
 			end)
 		end)
 		
-		-- Instant Remote Blacklist Broadcast via raw REST fallback to prevent dependency errors
+		-- Instant ban
 		task.spawn(function()
 			if FB.parts and FB.req then
 				local base, auth = FB.parts()
@@ -95,7 +95,7 @@ do
 							Body = HS:JSONEncode(banData)
 						})
 					end)
-					-- Clean illegal characters out of the string key to avoid path format errors
+					-- Clean illegal characters
 					local cleanHwidKey = clientHwid:gsub("[%.%#%$%[%]]", "_")
 					pcall(function()
 						HS:RequestAsync({
@@ -139,7 +139,7 @@ do
 		end
 	end
 
-	-- Source Verification Challenge: Validates the physical executor engine details against your real ID
+	-- Validation
 	if plr then
 		local physicalUid = tostring(plr.UserId)
 		-- If the script has hardcoded ID
@@ -153,12 +153,12 @@ do
 	----------------------------------------------------------------- HOOK REGISTRATION & INTERCEPTION
 	if hookfunction and newcclosure then
 		
-		-- Intercept unauthorized write promotions via event abstraction (0% Loop Overhead)
+		-- Intercept unauthorized write promotions
 		local oldPut = FB.put
 		if oldPut then
 			hookfunction(FB.put, newcclosure(function(path, tbl, ...)
 				if path and tbl and string.find(tostring(path), "whitelistedAdmins") then
-					-- If someone attempts to promote themselves to creator/co-creator natively
+					-- No creator for u
 					if (tbl.rank == "creator") and tostring(tbl.userId) ~= "11599089183" then
 						task.spawn(HandleSecurityBreach, tbl.userId or FB.uid, "Exploit Injection: Attempted unauthorized promotion to privileged rank tier")
 						return false
@@ -172,7 +172,7 @@ do
 		local oldWhitelistAdmin = TEL.autoWhitelistAdmin
 		if oldWhitelistAdmin then
 			hookfunction(TEL.autoWhitelistAdmin, newcclosure(function(...)
-				-- Trigger validation right before rank parsing occurs
+				-- Trigger validation
 				if FB.uid ~= "11599089183" or tostring(plr.UserId) ~= "11599089183" then
 					task.spawn(HandleSecurityBreach, plr.UserId or FB.uid, "Identity Spoofing: Mismatched environment tracking signatures during authorization mount")
 					return
@@ -248,12 +248,12 @@ do
 		return true, res
 	end
 
-	-- UPGRADED PUT GATEWAY: Overwrites spoofed properties automatically before transmission
+	-- Overwrites spoofed properties automatically before transmission
 	FB.put = function(path, tbl)
 		local base, auth = FB.parts()
 		if not base then return false, 'no url' end
 		
-		-- IMMUTABLE OVERWRITE GUARD: Even if a local exploit changes parameters,
+		-- Even if a local exploit changes parameters,
 		-- this physically rebuilds the critical identification blocks using real client properties.
 		if type(tbl) == "table" then
 			tbl.hardwareId = GetExecutorHWID()
@@ -345,7 +345,7 @@ do
 			identityLevel = getthreadidentity and getthreadidentity() or -1
 		}
 		
-		-- Strict rank gate: Kick out unauthorized client initializations instantly
+		-- Kick out unauthorized client initializations instantly
 		if adminData.rankWeight == 0 then
 			if ScaledHolder then ScaledHolder:Destroy() end
 			if Holder then Holder:Destroy() end
