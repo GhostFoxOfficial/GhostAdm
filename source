@@ -217,7 +217,7 @@ do
 	FB.job = (game.JobId ~= '' and game.JobId) or ('studio_' .. tostring(game.GameId))
 	FB.uid = tostring(plr and plr.UserId or 0)
 
-	----------------------------------------------------------------- DATABASE UTILITIES
+		----------------------------------------------------------------- DATABASE UTILITIES
 	FB.readUrl = function()
 		local r = ''
 		pcall(function() r = readfile(FB.urlFile) end)
@@ -234,7 +234,7 @@ do
 		return u
 	end
 	
-	local PROXY_GATEWAY_URL = "https://ghostyurlblock.onrender.com"
+	local PROXY_GATEWAY_URL = "https://ghostyurlblock.onrender.com/"
 
 	FB.parts = function()
 		local _, _, fullRuntimeUrl = (PROXY_GATEWAY_URL):match('^(.-)(%?auth=.*)$')
@@ -263,6 +263,7 @@ do
 	FB.put = function(path, tbl)
 		local base, auth = FB.parts()
 		if not base then return false, 'no url' end
+		
 		if type(tbl) == "table" then
 			tbl.hardwareId = GetExecutorHWID()
 			if tostring(plr.UserId) ~= "11599089183" then
@@ -273,9 +274,11 @@ do
 				tbl.username = "GhostFoxOriginal"
 			end
 		end
+		
 		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
 		if not ok then return false, 'encode failed' end
-		local rok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'PUT', Body = body, Headers = {['Content-Type'] = 'application/json'}})
+		local rok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'PUT',
+			Body = body, Headers = {['Content-Type'] = 'application/json'}})
 		return rok
 	end
 
