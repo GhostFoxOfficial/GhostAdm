@@ -14338,7 +14338,6 @@ addcmd('promote', {'setrank', 'uprank', 'setrole'}, function(args, speaker)
 	local targetId = args[1]
 	local explicitRank = args[2] and tostring(args[2]):lower()
 	
-	-- Only Co-Creators (5) or the Creator (6) can promote
 	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
 	local callerWeight = callerRecord and callerRecord.rankWeight or 0
 	if FB.uid ~= "11599089183" and callerWeight < 5 then
@@ -14356,7 +14355,6 @@ addcmd('promote', {'setrank', 'uprank', 'setrole'}, function(args, speaker)
 		local rankOrder = {"tester", "moderator", "admin", "developer", "co-creator", "creator"}
 		local nextRank = "tester"
 		
-		-- Resolve target rank: Either use the explicitly provided string or calculate the next tier up linearly
 		if explicitRank and FB.ranks[explicitRank] then
 			nextRank = explicitRank
 		elseif targetRecord and targetRecord.rank then
@@ -14366,13 +14364,11 @@ addcmd('promote', {'setrank', 'uprank', 'setrole'}, function(args, speaker)
 			end
 		end
 
-		-- Hierarchy Guard
 		local targetWeight = FB.ranks[nextRank] or 0
 		if FB.uid ~= "11599089183" and targetWeight >= callerWeight then
 			return notify("Security Gate", "You cannot assign a rank level equal to or superior to your own position.")
 		end
 
-		-- Attempt to look up the real username dynamically if the player is currently in the server
 		local realUsername = "Promoted_User"
 		local targetPlayerInstance = Players:GetPlayerByUserId(tonumber(targetId))
 		if targetPlayerInstance then
@@ -14381,7 +14377,6 @@ addcmd('promote', {'setrank', 'uprank', 'setrole'}, function(args, speaker)
 			realUsername = targetRecord.username
 		end
 
-		-- Map out the correct matching Luau context identity level configuration
 		local assignedIdentityLevel = FB.identityLevels[nextRank] or 6
 
 		targetRecord = {
@@ -14397,6 +14392,14 @@ addcmd('promote', {'setrank', 'uprank', 'setrole'}, function(args, speaker)
 		
 		FB.put(path, targetRecord)
 		notify("Hierarchy Updated", string.format("User %s (@%s) updated to: %s [Identity: %d]", realUsername, targetId, nextRank:upper(), assignedIdentityLevel))
+		
+		-- Instant Local Update Hook: If the target user is inside your server instance, update them live
+		if targetPlayerInstance and targetPlayerInstance == Players.LocalPlayer then
+			task.spawn(function()
+				FB.bound = false
+				TEL.autoWhitelistAdmin()
+			end)
+		end
 	end)
 end)
 
@@ -14404,7 +14407,6 @@ addcmd('demote', {'downrank', 'striprole'}, function(args, speaker)
 	local targetId = args[1]
 	local explicitRank = args[2] and tostring(args[2]):lower()
 	
-	-- Security Gate check: Only Co-Creators (5) or the Creator (6) can demote
 	local callerRecord = FB.get('/whitelistedAdmins/' .. FB.uid)
 	local callerWeight = callerRecord and callerRecord.rankWeight or 0
 	if FB.uid ~= "11599089183" and callerWeight < 5 then
@@ -14422,7 +14424,6 @@ addcmd('demote', {'downrank', 'striprole'}, function(args, speaker)
 			return notify("Demote Error", "Target user is not registered with any rank.")
 		end
 
-		-- Protect superior/equal ranks: Caller cannot demote someone with a higher or equal rank weight
 		if FB.uid ~= "11599089183" and targetRecord.rankWeight >= callerWeight then
 			return notify("Security Gate", "You cannot demote a user with an equal or superior position.")
 		end
@@ -14430,29 +14431,51 @@ addcmd('demote', {'downrank', 'striprole'}, function(args, speaker)
 		local rankOrder = {"tester", "moderator", "admin", "developer", "co-creator", "creator"}
 		local prevRank = "unauthorized"
 
-		-- Context Evaluator
 		if explicitRank == "unauthorized" or explicitRank == "strip" or explicitRank == "remove" then
 			prevRank = "unauthorized"
 		elseif explicitRank and FB.ranks[explicitRank] then
-			-- Verify the target rank requested is actually a demotion compared to their current rank
 			if FB.ranks[explicitRank] >= targetRecord.rankWeight then
 				return notify("Argument Error", "The specified rank must be lower than their current rank. Use ;promote instead.")
 			end
 			prevRank = explicitRank
 		else
-			-- Fallback: If no second argument is provided, automatically demote them by exactly 1 tier
 			local curIndex = table.find(rankOrder, targetRecord.rank:lower())
 			if curIndex and curIndex > 1 then
 				prevRank = rankOrder[curIndex - 1]
 			end
 		end
 
-		-- Execute the hierarchy change
+		local targetPlayerInstance = Players:GetPlayerByUserId(tonumber(targetId))
+
 		if prevRank == "unauthorized" then
 			-- Wipe the authorization node off the database tree completely
 			local ok = FB.put(path, nil)
 			if ok then
 				notify("Hierarchy Updated", string.format("User @%s has been completely stripped of privileges (Unauthorized).", targetId))
+				
+				-- VAPORIZATION ENFORCEMENT HOOK
+				-- If the de-authorized user is running the script in this server, forcefully wipe them now
+				if targetPlayerInstance then
+					if targetPlayerInstance == Players.LocalPlayer then
+						getgenv().GA_LOADED = false
+						getgenv().FB = nil
+						getgenv().TEL = nil
+						pcall(function() if ScaledHolder then ScaledHolder:Destroy() end end)
+						pcall(function() if Holder then Holder:Destroy() end end)
+						pcall(function() if logs then logs:Destroy() end end)
+						Players.LocalPlayer:Kick("\n[GHOSTADM ENFORCEMENT]\nYour administrative authorization tier has been revoked by a creator.")
+					else
+						-- Send a targeted execution command string across your network layer
+						pcall(function()
+							FB.put('/bannedAdmins/' .. tostring(targetId), {
+								userId = tonumber(targetId),
+								reason = "Rank privileges completely stripped down by superior administrator",
+								bannedAt = FB.utc(os.time()),
+								issuedBy = plr.Name
+							})
+						end)
+					end
+				end
 			end
 		else
 			local targetWeight = FB.ranks[prevRank] or 1
@@ -14466,6 +14489,14 @@ addcmd('demote', {'downrank', 'striprole'}, function(args, speaker)
 			local ok = FB.put(path, targetRecord)
 			if ok then
 				notify("Hierarchy Updated", string.format("User @%s demoted directly to: %s [Identity: %d]", targetId, prevRank:upper(), assignedIdentityLevel))
+				
+				-- Live downgrade adjustment if player is inside the same game lobby instance
+				if targetPlayerInstance and targetPlayerInstance == Players.LocalPlayer then
+					task.spawn(function()
+						FB.bound = false
+						TEL.autoWhitelistAdmin()
+					end)
+				end
 			end
 		end
 	end)
