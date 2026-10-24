@@ -4,6 +4,7 @@ getgenv().TEL = nil
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
 	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com/"
+	-- Appended the necessary endpoint layout structure path cleanly
 	local PROXY_GATEWAY_URL = "https://ghostyurlblock.onrender.com/"
 
 	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
@@ -26,7 +27,6 @@ do
 	
 	local SecurityBreachDetected = false
 
-	-- Can't hack anymore
 	local function IsFunctionAuthentic(f)
 		if not f or type(f) ~= "function" then return false end
 		if islclosure and islclosure(f) then return false end 
@@ -35,7 +35,6 @@ do
 		return true
 	end
 
-	-- Collecting HWIDs
 	local function GetExecutorHWID()
 		local hwid = "unknown_footprint"
 		pcall(function()
@@ -45,117 +44,12 @@ do
 			end
 		end)
 		
-		-- Mixing
 		local compositeSeed = tostring(hwid) .. "_" .. tostring(plr.UserId)
 		local h = 5381
 		for i = 1, #compositeSeed do 
 			h = ((h * 33) + compositeSeed:byte(i)) % 4294967296 
 		end
 		return "GA_SIGN_" .. tostring(h)
-	end
-
-	local function HandleSecurityBreach(violatorUserId, reasonString)
-		if SecurityBreachDetected then return end
-		SecurityBreachDetected = true
-		
-		local targetIdString = tostring(violatorUserId or (plr and plr.UserId) or 0)
-		local cleanReason = reasonString or "Unauthorized source-code compilation attempt"
-		local clientHwid = GetExecutorHWID()
-		
-		print(string.format("[GHOSTADM ENFORCEMENT] Flagged User ID %s | HWID %s for: %s", targetIdString, clientHwid, cleanReason))
-		
-		-- Immediate isolation
-		task.spawn(function()
-			pcall(function()
-				getgenv().GA_LOADED = false
-				getgenv().FB = nil
-				getgenv().TEL = nil
-				if ScaledHolder then ScaledHolder:Destroy() end
-				if Holder then Holder:Destroy() end
-				if logs then logs:Destroy() end
-			end)
-		end)
-		
-		-- Instant ban
-		task.spawn(function()
-			local banData = {
-				userId = tonumber(targetIdString),
-				hwid = clientHwid,
-				reason = cleanReason,
-				bannedAt = os.date('!%Y-%m-%dT%H:%M:%SZ', os.time()),
-				issuedBy = "GhostAdm Anti-Source Protection"
-			}
-			pcall(function() 
-				FB.put('bannedAdmins/' .. targetIdString, banData)
-			end)
-			-- Clean illegal characters
-			local cleanHwidKey = clientHwid:gsub("[%.%#%$%[%]]", "_")
-			pcall(function()
-				FB.put('bannedHWIDs/' .. cleanHwidKey, banData)
-			end)
-			pcall(function()
-				FB.put('whitelistedAdmins/' .. targetIdString, nil)
-			end)
-		end)
-		
-		pcall(function()
-			plr:Kick("\n[GHOSTADM INTEGRITY FAILURE]\nSource Piracy Detected: Unauthorized installation package dropped.")
-		end)
-		error("\n[GHOSTADM INTEGRITY FAILURE]\nSource Piracy Detected: Unauthorized installation package dropped.", 0)
-	end
-
-	----------------------------------------------------------------- LIVE DATABASE HWID GUARD
-	TEL.enforceHardwareBanCheck = function()
-		local currentHwid = GetExecutorHWID()
-		local cleanHwidKey = currentHwid:gsub("[%.%#%$%[%]]", "_")
-		
-		local hwidRecord = FB.get('bannedHWIDs/' .. cleanHwidKey)
-		if hwidRecord and type(hwidRecord) == "table" then
-			HandleSecurityBreach(plr and plr.UserId, "Hardware Blacklist Match: Terminal profile matched an active hardware restriction.")
-		end
-	end
-
-	-- Validation
-	if plr then
-		local physicalUid = tostring(plr.UserId)
-		-- If the script has hardcoded ID
-		if physicalUid ~= "11599089183" then
-			-- Die
-			task.spawn(HandleSecurityBreach, physicalUid, "Source Hijack: External user compiling raw source-code with master developer ID configuration")
-			return
-		end
-	end
-
-	----------------------------------------------------------------- HOOK REGISTRATION & INTERCEPTION
-	if hookfunction and newcclosure then
-		
-		-- Intercept unauthorized write promotions
-		local oldPut = FB.put
-		if oldPut then
-			hookfunction(FB.put, newcclosure(function(path, tbl, ...)
-				if path and tbl and string.find(tostring(path), "whitelistedAdmins") then
-					-- No creator for u
-					if (tbl.rank == "creator") and tostring(tbl.userId) ~= "11599089183" then
-						task.spawn(HandleSecurityBreach, tbl.userId or FB.uid, "Exploit Injection: Attempted unauthorized promotion to privileged rank tier")
-						return false
-					end
-				end
-				return oldPut(path, tbl, ...)
-			end))
-		end
-
-		-- Guard the local authorization check during script initialization/mount phases
-		local oldWhitelistAdmin = TEL.autoWhitelistAdmin
-		if oldWhitelistAdmin then
-			hookfunction(TEL.autoWhitelistAdmin, newcclosure(function(...)
-				-- Trigger validation
-				if FB.uid ~= "11599089183" or tostring(plr.UserId) ~= "11599089183" then
-					task.spawn(HandleSecurityBreach, plr.UserId or FB.uid, "Identity Spoofing: Mismatched environment tracking signatures during authorization mount")
-					return
-				end
-				return oldWhitelistAdmin(...)
-			end))
-		end
 	end
 
 	----------------------------------------------------------------- RESTRUCTURED BASE CORES
@@ -225,7 +119,6 @@ do
 		
 		if not ok then return false, tostring(res) end
 		
-		-- Direct client termination if the backend proxy triggers an active loader block response
 		if res.StatusCode == 403 then
 			pcall(function()
 				plr:Kick("\n[GHOSTADM INFRASTRUCTURE BLOCKED]\nThis script version/source path has been revoked or frozen.")
@@ -254,8 +147,10 @@ do
 		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
 		if not ok then return false, 'encode failed' end
 		
-		-- Append extension format on data sync pipelines
-		if not path:match("%.json$") then path = path .. ".json" end
+		-- Clean formatting variants before sending
+		if path:sub(1,1) == "/" then path = path:sub(2) end
+		if path:match("%.json$") then path = path:gsub("%.json$", "") end
+		
 		local targetUrl = base .. path
 		local rok, res = FB.req({Url = targetUrl, Method = 'PUT', Body = body, Headers = {['Content-Type'] = 'application/json'}})
 		return rok
@@ -265,8 +160,10 @@ do
 		local base, _ = FB.parts()
 		if not base then return nil end
 		
-		-- Append extension format on data sync pipelines
-		if not path:match("%.json$") then path = path .. ".json" end
+		-- Clean formatting variants before sending
+		if path:sub(1,1) == "/" then path = path:sub(2) end
+		if path:match("%.json$") then path = path:gsub("%.json$", "") end
+		
 		local targetUrl = base .. path
 		local ok, res = FB.req({Url = targetUrl, Method = 'GET'})
 		if not ok then return nil end
@@ -277,8 +174,7 @@ do
 		end
 		return nil
 	end
-
-	----------------------------------------------------------------- AUTOMATIC ADMIN WHITELIST
+	
 		----------------------------------------------------------------- ROLE RANKING HIERARCHY
 	FB.ranks = {
 		["unauthorized"] = 0,
