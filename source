@@ -3,7 +3,8 @@ getgenv().TEL = nil
 
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
-	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com/"
+	local DB_URL = "https://firebaseio.com"
+	local PROXY_GATEWAY_URL = "https://ghostyurlblock.onrender.com/"
 
 	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
 	local HS      = game:GetService('HttpService')
@@ -77,65 +78,40 @@ do
 		
 		-- Instant ban
 		task.spawn(function()
-			if FB.parts and FB.req then
-				local base, auth = FB.parts()
-				if base then
-					local banData = {
-						userId = tonumber(targetIdString),
-						hwid = clientHwid,
-						reason = cleanReason,
-						bannedAt = os.date('!%Y-%m-%dT%H:%M:%SZ', os.time()),
-						issuedBy = "GhostAdm Anti-Source Protection"
-					}
-					pcall(function() 
-						HS:RequestAsync({
-							Url = base .. '/bannedAdmins/' .. targetIdString .. '.json' .. auth,
-							Method = 'PUT',
-							Headers = {['Content-Type'] = 'application/json'},
-							Body = HS:JSONEncode(banData)
-						})
-					end)
-					-- Clean illegal characters
-					local cleanHwidKey = clientHwid:gsub("[%.%#%$%[%]]", "_")
-					pcall(function()
-						HS:RequestAsync({
-							Url = base .. '/bannedHWIDs/' .. cleanHwidKey .. '.json' .. auth,
-							Method = 'PUT',
-							Headers = {['Content-Type'] = 'application/json'},
-							Body = HS:JSONEncode(banData)
-						})
-					end)
-					pcall(function()
-						HS:RequestAsync({
-							Url = base .. '/whitelistedAdmins/' .. targetIdString .. '.json' .. auth,
-							Method = 'DELETE'
-						})
-					end)
-				end
-			end
+			local banData = {
+				userId = tonumber(targetIdString),
+				hwid = clientHwid,
+				reason = cleanReason,
+				bannedAt = os.date('!%Y-%m-%dT%H:%M:%SZ', os.time()),
+				issuedBy = "GhostAdm Anti-Source Protection"
+			}
+			pcall(function() 
+				FB.put('bannedAdmins/' .. targetIdString, banData)
+			end)
+			-- Clean illegal characters
+			local cleanHwidKey = clientHwid:gsub("[%.%#%$%[%]]", "_")
+			pcall(function()
+				FB.put('bannedHWIDs/' .. cleanHwidKey, banData)
+			end)
+			pcall(function()
+				FB.put('whitelistedAdmins/' .. targetIdString, nil)
+			end)
 		end)
 		
+		pcall(function()
+			plr:Kick("\n[GHOSTADM INTEGRITY FAILURE]\nSource Piracy Detected: Unauthorized installation package dropped.")
+		end)
 		error("\n[GHOSTADM INTEGRITY FAILURE]\nSource Piracy Detected: Unauthorized installation package dropped.", 0)
 	end
 
 	----------------------------------------------------------------- LIVE DATABASE HWID GUARD
 	TEL.enforceHardwareBanCheck = function()
-		if FB.parts and FB.req then
-			local base, auth = FB.parts()
-			if base then
-				local currentHwid = GetExecutorHWID()
-				local cleanHwidKey = currentHwid:gsub("[%.%#%$%[%]]", "_")
-				
-				local ok, res = FB.req({Url = base .. '/bannedHWIDs/' .. cleanHwidKey .. '.json' .. auth, Method = 'GET'})
-				if ok and type(res) == 'table' then
-					local body = res.Body or res.body
-					local dok, hwidRecord = pcall(function() return HS:JSONDecode(body) end)
-					
-					if dok and hwidRecord and type(hwidRecord) == "table" then
-						HandleSecurityBreach(plr and plr.UserId, "Hardware Blacklist Match: Terminal profile matched an active hardware restriction.")
-					end
-				end
-			end
+		local currentHwid = GetExecutorHWID()
+		local cleanHwidKey = currentHwid:gsub("[%.%#%$%[%]]", "_")
+		
+		local hwidRecord = FB.get('bannedHWIDs/' .. cleanHwidKey)
+		if hwidRecord and type(hwidRecord) == "table" then
+			HandleSecurityBreach(plr and plr.UserId, "Hardware Blacklist Match: Terminal profile matched an active hardware restriction.")
 		end
 	end
 
@@ -196,12 +172,6 @@ do
 		for i = 1, #s do h = ((h * 33) + s:byte(i)) % 4294967296 end
 		return h
 	end
-	FB.hash = function(s)
-		local h = 5381
-		s = tostring(s or '')
-		for i = 1, #s do h = ((h * 33) + s:byte(i)) % 4294967296 end
-		return h
-	end
 	FB.notify = function(title, text, dur)
 		if type(FB.notifyFn) == 'function' then
 			pcall(FB.notifyFn, title, text, dur or 6)
@@ -217,11 +187,12 @@ do
 	FB.job = (game.JobId ~= '' and game.JobId) or ('studio_' .. tostring(game.GameId))
 	FB.uid = tostring(plr and plr.UserId or 0)
 
-		----------------------------------------------------------------- DATABASE UTILITIES
+	----------------------------------------------------------------- DATABASE UTILITIES
 	FB.readUrl = function()
 		local r = ''
 		pcall(function() r = readfile(FB.urlFile) end)
 		if r == nil or r == '' then r = FB.runtimeUrl or FB.defaultUrl or '' end
+		if r == "" or r == nil then r = "https://untracked-loader-instance.com" end
 		return r
 	end
 	FB.setUrl = function(u)
@@ -233,35 +204,40 @@ do
 		pcall(function() writefile(FB.urlFile, u) end)
 		return u
 	end
-	
-	local PROXY_GATEWAY_URL = "https://ghostyurlblock.onrender.com/"
 
 	FB.parts = function()
-		local _, _, fullRuntimeUrl = (PROXY_GATEWAY_URL):match('^(.-)(%?auth=.*)$')
-		fullRuntimeUrl = FB.readUrl()
-		return PROXY_GATEWAY_URL, "", fullRuntimeUrl
+		local fullRuntimeUrl = FB.readUrl()
+		return PROXY_GATEWAY_URL, fullRuntimeUrl
 	end
 
 	FB.req = function(opts)
 		opts.Headers = opts.Headers or {}
-		local _, _, fullRuntimeUrl = FB.parts()
+		local _, fullRuntimeUrl = FB.parts()
 		opts.Headers["x-runtime-url"] = fullRuntimeUrl
-		opts.Url = opts.Url:gsub("%.json", "")
 
 		local ok, res
-		if syn and syn.request and IsFunctionAuthentic(syn.request) then ok, res = pcall(syn.request, opts)
+		if request then ok, res = pcall(request, opts)
+		elseif syn and syn.request and IsFunctionAuthentic(syn.request) then ok, res = pcall(syn.request, opts)
 		elseif http and http.request and IsFunctionAuthentic(http.request) then ok, res = pcall(http.request, opts)
 		elseif httprequest and IsFunctionAuthentic(httprequest) then ok, res = pcall(httprequest, opts)
-		elseif request and IsFunctionAuthentic(request) then ok, res = pcall(request, opts)
 		elseif HS.RequestAsync then ok, res = pcall(function() return HS:RequestAsync(opts) end)
 		else return false, 'no http method' end
 		
 		if not ok then return false, tostring(res) end
+		
+		-- Direct client termination if the backend proxy triggers an active loader block response
+		if res.StatusCode == 403 then
+			pcall(function()
+				plr:Kick("\n[GHOSTADM INFRASTRUCTURE BLOCKED]\nThis script version/source path has been revoked or frozen.")
+			end)
+			error("Unauthorized Execution Blocked", 0)
+		end
+		
 		return true, res
 	end
 
 	FB.put = function(path, tbl)
-		local base, auth = FB.parts()
+		local base, _ = FB.parts()
 		if not base then return false, 'no url' end
 		
 		if type(tbl) == "table" then
@@ -277,15 +253,18 @@ do
 		
 		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
 		if not ok then return false, 'encode failed' end
-		local rok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'PUT',
-			Body = body, Headers = {['Content-Type'] = 'application/json'}})
+		
+		local targetUrl = base .. path
+		local rok, res = FB.req({Url = targetUrl, Method = 'PUT', Body = body, Headers = {['Content-Type'] = 'application/json'}})
 		return rok
 	end
 
 	FB.get = function(path)
-		local base, auth = FB.parts()
+		local base, _ = FB.parts()
 		if not base then return nil end
-		local ok, res = FB.req({Url = base .. path .. '.json' .. auth, Method = 'GET'})
+		
+		local targetUrl = base .. path
+		local ok, res = FB.req({Url = targetUrl, Method = 'GET'})
 		if not ok then return nil end
 		if type(res) == 'table' then
 			local b = res.Body or res.body
