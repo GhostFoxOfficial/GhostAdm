@@ -254,6 +254,8 @@ do
 		local ok, body = pcall(function() return HS:JSONEncode(tbl) end)
 		if not ok then return false, 'encode failed' end
 		
+		-- Append extension format on data sync pipelines
+		if not path:match("%.json$") then path = path .. ".json" end
 		local targetUrl = base .. path
 		local rok, res = FB.req({Url = targetUrl, Method = 'PUT', Body = body, Headers = {['Content-Type'] = 'application/json'}})
 		return rok
@@ -263,6 +265,8 @@ do
 		local base, _ = FB.parts()
 		if not base then return nil end
 		
+		-- Append extension format on data sync pipelines
+		if not path:match("%.json$") then path = path .. ".json" end
 		local targetUrl = base .. path
 		local ok, res = FB.req({Url = targetUrl, Method = 'GET'})
 		if not ok then return nil end
