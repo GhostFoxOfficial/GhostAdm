@@ -3,7 +3,7 @@ getgenv().TEL = nil
 
 do
 	----------------------------------------------------------------- DATA INFRASTRUCTURE
-	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com"
+	local DB_URL = "https://ghostadmhouse-default-rtdb.firebaseio.com/"
 
 	----------------------------------------------------------------- ENVIRONMENT INITIALIZATION
 	local HS      = game:GetService('HttpService')
